@@ -63,10 +63,41 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
 
   const [isSpeaking, setIsSpeaking] = useState(false);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const preloadedAudioRef = useRef<{ text: string; blobUrl: string } | null>(null);
+
+  const fetchTtsBlob = useCallback(async (text: string): Promise<string> => {
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ text, speed: speechRate }),
+      }
+    );
+    if (!response.ok) throw new Error(`TTS failed: ${response.status}`);
+    const audioBlob = await response.blob();
+    return URL.createObjectURL(audioBlob);
+  }, [speechRate]);
+
+  const preloadNextTurn = useCallback(async () => {
+    const nextIdx = currentTurn + 1;
+    if (nextIdx >= activeTurns.length) return;
+    const nextText = activeTurns[nextIdx]?.dutchText;
+    if (!nextText || preloadedAudioRef.current?.text === nextText) return;
+    try {
+      const blobUrl = await fetchTtsBlob(nextText);
+      preloadedAudioRef.current = { text: nextText, blobUrl };
+    } catch {
+      // Preload failure is non-critical
+    }
+  }, [currentTurn, activeTurns, fetchTtsBlob]);
 
   const speakDutch = useCallback(async (text?: string) => {
     if (muted) return;
-    // Stop any currently playing audio
     if (currentAudioRef.current) {
       currentAudioRef.current.pause();
       currentAudioRef.current = null;
@@ -74,23 +105,15 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     const spokenText = text || turn.dutchText;
     setIsSpeaking(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({ text: spokenText, speed: speechRate }),
-        }
-      );
-      if (!response.ok) {
-        throw new Error(`TTS failed: ${response.status}`);
+      // Use preloaded audio if available for this text
+      let audioUrl: string;
+      if (preloadedAudioRef.current?.text === spokenText) {
+        audioUrl = preloadedAudioRef.current.blobUrl;
+        preloadedAudioRef.current = null;
+      } else {
+        audioUrl = await fetchTtsBlob(spokenText);
       }
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
+
       const audio = new Audio();
       currentAudioRef.current = audio;
       audio.onended = () => {
@@ -98,18 +121,18 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
         URL.revokeObjectURL(audioUrl);
         currentAudioRef.current = null;
       };
-      // Wait for full audio to be ready before playing to prevent clipping
       audio.preload = "auto";
       audio.src = audioUrl;
       await new Promise<void>((resolve, reject) => {
-        audio.oncanplaythrough = () => resolve();
+        audio.oncanplay = () => resolve();
         audio.onerror = () => reject(new Error("Audio load failed"));
       });
       await audio.play();
+      // Start preloading next turn's audio in background
+      preloadNextTurn();
     } catch (e) {
       console.error("ElevenLabs TTS failed, falling back to browser speech:", e);
       setIsSpeaking(false);
-      // Fallback to browser speech synthesis
       const utterance = new SpeechSynthesisUtterance(spokenText);
       utterance.lang = "nl-NL";
       utterance.rate = speechRate;
@@ -121,7 +144,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
       if (dutchVoice) utterance.voice = dutchVoice;
       speechSynthesis.speak(utterance);
     }
-  }, [turn, speechRate, muted]);
+  }, [turn, speechRate, muted, fetchTtsBlob, preloadNextTurn]);
 
   // Auto-play dialogue when turn changes
   useEffect(() => {
