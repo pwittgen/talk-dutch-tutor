@@ -57,18 +57,59 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
   const turn = turns[currentTurn];
   const progress = ((currentTurn) / turns.length) * 100;
 
-  const speakDutch = useCallback((text?: string) => {
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const speakDutch = useCallback(async (text?: string) => {
     if (muted) return;
-    const utterance = new SpeechSynthesisUtterance(text || turn.dutchText);
-    utterance.lang = "nl-NL";
-    utterance.rate = speechRate;
-    utterance.pitch = 1.0;
-    const voices = speechSynthesis.getVoices();
-    const dutchVoice = voices.find(
-      (v) => v.lang.startsWith("nl") && v.name.toLowerCase().includes("female")
-    ) || voices.find((v) => v.lang.startsWith("nl"));
-    if (dutchVoice) utterance.voice = dutchVoice;
-    speechSynthesis.speak(utterance);
+    // Stop any currently playing audio
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+    }
+    const spokenText = text || turn.dutchText;
+    setIsSpeaking(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ text: spokenText, speed: speechRate }),
+        }
+      );
+      if (!response.ok) {
+        throw new Error(`TTS failed: ${response.status}`);
+      }
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      currentAudioRef.current = audio;
+      audio.onended = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+        currentAudioRef.current = null;
+      };
+      await audio.play();
+    } catch (e) {
+      console.error("ElevenLabs TTS failed, falling back to browser speech:", e);
+      setIsSpeaking(false);
+      // Fallback to browser speech synthesis
+      const utterance = new SpeechSynthesisUtterance(spokenText);
+      utterance.lang = "nl-NL";
+      utterance.rate = speechRate;
+      utterance.pitch = 1.0;
+      const voices = speechSynthesis.getVoices();
+      const dutchVoice = voices.find(
+        (v) => v.lang.startsWith("nl") && v.name.toLowerCase().includes("female")
+      ) || voices.find((v) => v.lang.startsWith("nl"));
+      if (dutchVoice) utterance.voice = dutchVoice;
+      speechSynthesis.speak(utterance);
+    }
   }, [turn, speechRate, muted]);
 
   // Auto-play dialogue when turn changes
@@ -277,10 +318,11 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
               <div className="mt-2 flex items-center gap-3">
                 <button
                   onClick={() => speakDutch()}
-                  className="flex items-center gap-1 text-sm font-medium text-secondary hover:text-secondary/80 transition-colors"
+                  disabled={isSpeaking}
+                  className="flex items-center gap-1 text-sm font-medium text-secondary hover:text-secondary/80 transition-colors disabled:opacity-50"
                 >
-                  {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-                  {muted ? "Muted" : "Listen"}
+                  {muted ? <VolumeX className="h-4 w-4" /> : isSpeaking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Volume2 className="h-4 w-4" />}
+                  {muted ? "Muted" : isSpeaking ? "Playing..." : "Listen"}
                 </button>
               </div>
               {/* Speed control */}
