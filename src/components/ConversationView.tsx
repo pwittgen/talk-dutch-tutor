@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, RotateCcw, ArrowRight, Volume2, Keyboard, Loader2, BookOpen, MessageSquare, Sparkles } from "lucide-react";
+import { Mic, MicOff, RotateCcw, ArrowRight, Volume2, Keyboard, Loader2, BookOpen, MessageSquare, Sparkles, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { type ConversationTurn } from "@/data/scenarios";
@@ -42,7 +42,10 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, onComplete }: C
   const [textInput, setTextInput] = useState("");
   const [score, setScore] = useState(0);
   const [isEvaluating, setIsEvaluating] = useState(false);
+  const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const turn = turns[currentTurn];
   const progress = ((currentTurn) / turns.length) * 100;
@@ -99,6 +102,22 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, onComplete }: C
       return;
     }
 
+    // Start audio recording for playback
+    navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+      const mediaRecorder = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        setRecordedAudioUrl(URL.createObjectURL(blob));
+        stream.getTracks().forEach((t) => t.stop());
+      };
+      mediaRecorder.start();
+      mediaRecorderRef.current = mediaRecorder;
+    }).catch(() => {});
+
     const recognition = new SpeechRecognition();
     recognition.lang = "nl-NL";
     recognition.interimResults = false;
@@ -107,11 +126,13 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, onComplete }: C
     recognition.onresult = (event: any) => {
       const result = event.results[0][0].transcript;
       setIsListening(false);
+      mediaRecorderRef.current?.stop();
       evaluateWithAI(result);
     };
 
     recognition.onerror = () => {
       setIsListening(false);
+      mediaRecorderRef.current?.stop();
       setShowTextInput(true);
     };
 
@@ -126,6 +147,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, onComplete }: C
 
   const stopListening = useCallback(() => {
     recognitionRef.current?.stop();
+    mediaRecorderRef.current?.stop();
     setIsListening(false);
   }, []);
 
@@ -147,14 +169,29 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, onComplete }: C
 
   const handleRetry = () => {
     setFeedback(null);
+    setRecordedAudioUrl(null);
   };
 
   const speakDutch = useCallback((text?: string) => {
     const utterance = new SpeechSynthesisUtterance(text || turn.dutchText);
     utterance.lang = "nl-NL";
-    utterance.rate = 0.85;
+    utterance.rate = 0.7;
+    utterance.pitch = 1.1;
+    // Try to find a female Dutch voice for a friendlier tone
+    const voices = speechSynthesis.getVoices();
+    const dutchVoice = voices.find(
+      (v) => v.lang.startsWith("nl") && v.name.toLowerCase().includes("female")
+    ) || voices.find((v) => v.lang.startsWith("nl"));
+    if (dutchVoice) utterance.voice = dutchVoice;
     speechSynthesis.speak(utterance);
   }, [turn]);
+
+  const playRecording = useCallback(() => {
+    if (recordedAudioUrl) {
+      const audio = new Audio(recordedAudioUrl);
+      audio.play();
+    }
+  }, [recordedAudioUrl]);
 
   return (
     <div className="flex min-h-[70vh] flex-col">
@@ -320,6 +357,15 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, onComplete }: C
               } border`}>
                 <p className="text-sm font-medium text-muted-foreground">You said:</p>
                 <p className="font-display text-lg font-bold text-foreground">{feedback.userAnswer}</p>
+                {recordedAudioUrl && (
+                  <button
+                    onClick={playRecording}
+                    className="mt-2 flex items-center gap-1 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+                  >
+                    <Play className="h-4 w-4" />
+                    Play my recording
+                  </button>
+                )}
               </div>
             </div>
 
