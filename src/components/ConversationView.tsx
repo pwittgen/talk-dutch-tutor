@@ -10,6 +10,7 @@ interface ConversationViewProps {
   turns: ConversationTurn[];
   scenarioEmoji: string;
   scenarioTitle: string;
+  openEnded?: boolean;
   onComplete: () => void;
 }
 
@@ -34,7 +35,7 @@ const gradeConfig = {
   incorrect: { emoji: "🔄", label: "Let's try again", color: "text-destructive", bg: "bg-destructive/10 border-destructive/20" },
 };
 
-const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, onComplete }: ConversationViewProps) => {
+const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, onComplete }: ConversationViewProps) => {
   const [currentTurn, setCurrentTurn] = useState(0);
   const [isListening, setIsListening] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
@@ -60,6 +61,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, onComplete }: C
           englishHint: turn.englishHint,
           scenarioContext: `${scenarioTitle} - Turn ${currentTurn + 1} of ${turns.length}`,
           imageDescription: turn.imageDescription || null,
+          openEnded: openEnded || false,
         },
       });
 

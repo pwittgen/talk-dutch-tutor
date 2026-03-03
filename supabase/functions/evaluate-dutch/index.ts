@@ -12,25 +12,37 @@ serve(async (req) => {
   }
 
   try {
-    const { userAnswer, dutchPrompt, englishHint, scenarioContext, imageDescription } = await req.json();
+    const { userAnswer, dutchPrompt, englishHint, scenarioContext, imageDescription, openEnded } = await req.json();
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
+    const openEndedRules = openEnded ? `
+OPEN-ENDED SCENARIO RULES:
+- There is NO single correct answer. Accept ANY response that is contextually appropriate.
+- The student can talk about anything as long as it fits the conversational context.
+- REJECT responses that are racist, discriminatory, hateful, mean-spirited, or contain slurs/insults.
+- If the content is inappropriate, set grade to "incorrect" and feedback explaining it's not appropriate.
+- Grade "perfect" if grammatically correct and fits the conversation naturally.
+- Grade "good" if understandable with minor grammar issues.
+- Grade "needs_improvement" if the idea is fine but grammar needs work.
+- Be very encouraging — creativity and self-expression matter here!` : '';
+
     const systemPrompt = `You are a friendly Dutch language tutor for A1-A2 level English-speaking students. 
 You evaluate student responses in Dutch conversations. Be encouraging but accurate.
+${openEndedRules}
 
 IMPORTANT RULES:
 - Accept ANY response that is contextually appropriate for the situation, not just exact phrases
 - Focus on whether the student communicated the right meaning, even if phrasing differs
 - Evaluate grammar, vocabulary, and pronunciation patterns
 - If they used speech recognition, note common Dutch pronunciation mistakes English speakers make
-- Always provide the "ideal" response as a learning reference
+- Always provide the "ideal" response as a learning reference${openEnded ? ' (suggest what would be a natural reply)' : ''}
 - Grade on a scale: "perfect", "good", "needs_improvement", "incorrect"
 - "perfect" = grammatically correct and contextually appropriate
 - "good" = understandable and mostly correct, minor issues
 - "needs_improvement" = right idea but significant grammar/vocab errors
-- "incorrect" = wrong meaning or completely off-topic`;
+- "incorrect" = wrong meaning or completely off-topic${openEnded ? ' or inappropriate/offensive content' : ''}`;
 
     let userPrompt = `SCENARIO CONTEXT: ${scenarioContext}
 
