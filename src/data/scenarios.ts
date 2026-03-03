@@ -8,6 +8,8 @@ import cafeImg from "@/assets/scenarios/cafe.jpg";
 import postOfficeImg from "@/assets/scenarios/post-office.jpg";
 import marketImg from "@/assets/scenarios/market.jpg";
 import hotelImg from "@/assets/scenarios/hotel.jpg";
+import feboImg from "@/assets/scenarios/febo.jpg";
+import randomEncounterImg from "@/assets/scenarios/random-encounter.jpg";
 
 export interface ConversationTurn {
   speaker: "dutch";
@@ -30,6 +32,7 @@ export interface Scenario {
   difficulty: "beginner" | "easy" | "medium";
   color: "orange" | "blue" | "teal";
   scenarioImage: string;
+  openEnded?: boolean;
   conversations: ConversationTurn[];
 }
 
@@ -571,6 +574,115 @@ export const scenarios: Scenario[] = [
         expectedResponses: ["heel erg bedankt", "dank u wel", "hartelijk dank"],
         feedbackOnWrong: "Try: 'Heel erg bedankt!'",
         grammarTip: "'Wachtwoord' = password. 'Prettig verblijf' = pleasant stay.",
+      },
+    ],
+  },
+  {
+    id: "febo",
+    title: "Snacking at FEBO",
+    dutchTitle: "Bij de FEBO",
+    emoji: "🍟",
+    description: "Order classic Dutch snacks from the famous automat",
+    difficulty: "beginner",
+    color: "orange",
+    scenarioImage: feboImg,
+    conversations: [
+      {
+        speaker: "dutch",
+        dutchText: "Hallo! Welkom bij de FEBO. Wat mag het zijn?",
+        englishHint: "Look at the image — you see rows of golden fried snacks behind glass doors: kroketten, frikandellen, and kaassoufflés. Order a kroket.",
+        imageUrl: feboImg,
+        imageDescription: "A FEBO snackbar automat wall with golden croquettes, frikandellen, and kaassoufflés behind small glass doors with warm yellow lighting.",
+        expectedResponses: ["een kroket alstublieft", "ik wil graag een kroket", "mag ik een kroket"],
+        feedbackOnWrong: "Try: 'Een kroket alstublieft'",
+        grammarTip: "'Kroket' is a deep-fried ragout roll — the most iconic Dutch snack! At FEBO you can grab them from the automat wall.",
+      },
+      {
+        speaker: "dutch",
+        dutchText: "Goede keuze! Wilt u er friet bij?",
+        englishHint: "Say yes and ask for fries with mayonnaise.",
+        expectedResponses: ["ja, friet met mayonaise alstublieft", "ja graag, patat met mayo", "ja friet met mayo"],
+        feedbackOnWrong: "Try: 'Ja, friet met mayonaise alstublieft'",
+        grammarTip: "The Dutch love mayo on fries! 'Friet' and 'patat' both mean fries — 'friet' is more common in the south, 'patat' in the north.",
+      },
+      {
+        speaker: "dutch",
+        dutchText: "Friet met mayo! Wilt u er nog een snack bij? We hebben frikandellen en kaassoufflés.",
+        englishHint: "Order a frikandel speciaal (with onions, curry, and mayo).",
+        expectedResponses: ["een frikandel speciaal alstublieft", "mag ik een frikandel speciaal", "ik wil een frikandel speciaal"],
+        feedbackOnWrong: "Try: 'Een frikandel speciaal alstublieft'",
+        grammarTip: "'Frikandel speciaal' is a frikandel cut open with curry ketchup, mayo, and raw onions. A Dutch classic!",
+      },
+      {
+        speaker: "dutch",
+        dutchText: "Mmm lekker! Wilt u iets te drinken? We hebben cola, fanta en chocomel.",
+        englishHint: "Order a chocomel (chocolate milk — very Dutch!).",
+        expectedResponses: ["een chocomel alstublieft", "chocomel graag", "mag ik een chocomel"],
+        feedbackOnWrong: "Try: 'Een chocomel alstublieft'",
+        grammarTip: "'Chocomel' is the beloved Dutch chocolate milk brand. 'Iets te drinken' = something to drink.",
+      },
+      {
+        speaker: "dutch",
+        dutchText: "Dat wordt dan acht euro vijfenzeventig. Eet smakelijk!",
+        englishHint: "Say 'Thank you, it looks delicious!'",
+        expectedResponses: ["dank u wel, het ziet er lekker uit", "bedankt, lekker", "dank u wel"],
+        feedbackOnWrong: "Try: 'Dank u wel, het ziet er lekker uit!'",
+        grammarTip: "'Het ziet er lekker uit' = it looks delicious. 'Eet smakelijk' = enjoy your meal!",
+      },
+    ],
+  },
+  {
+    id: "random-encounter",
+    title: "Random Encounter",
+    dutchTitle: "Willekeurig gesprek",
+    emoji: "🎲",
+    description: "Free conversation — respond however you like, as long as it fits the context!",
+    difficulty: "medium",
+    color: "teal",
+    scenarioImage: randomEncounterImg,
+    openEnded: true,
+    conversations: [
+      {
+        speaker: "dutch",
+        dutchText: "Hé, hallo! Leuk weer vandaag, hè? Wat ga je vandaag doen?",
+        englishHint: "A friendly stranger on the street is chatting about the weather. Respond naturally — say what you're doing today, or comment on the weather!",
+        imageUrl: randomEncounterImg,
+        imageDescription: "A lively Dutch city street with people walking, a bicycle parked by a canal railing, shops, and a friendly person waving.",
+        expectedResponses: [],
+        feedbackOnWrong: "Try to respond naturally in Dutch! Talk about your day or the weather.",
+        grammarTip: "'Leuk weer' = nice weather. 'Hè' is a Dutch tag question like 'right?'. You can say things like 'Ik ga winkelen' (I'm going shopping) or 'Ik ga naar het park' (I'm going to the park).",
+      },
+      {
+        speaker: "dutch",
+        dutchText: "Oh leuk! Ken je deze buurt een beetje? Er is een heel leuke winkel om de hoek.",
+        englishHint: "They're asking if you know the neighborhood. Say whatever feels natural — you could say you're new here, or that you've visited before!",
+        expectedResponses: [],
+        feedbackOnWrong: "Try responding in Dutch — you could say 'Nee, ik ben hier nieuw' or 'Ja, ik woon hier in de buurt'.",
+        grammarTip: "'Buurt' = neighborhood. 'Om de hoek' = around the corner. 'Ken je' = do you know (informal).",
+      },
+      {
+        speaker: "dutch",
+        dutchText: "Ik ga zo koffie drinken bij dat café daar. Heb jij al geluncht?",
+        englishHint: "They're heading for coffee and asking about your lunch plans. Share your plans or ask to join!",
+        expectedResponses: [],
+        feedbackOnWrong: "Try something like 'Nee, nog niet! Mag ik mee?' or 'Ja, ik heb al gegeten'.",
+        grammarTip: "'Geluncht' is the past participle of 'lunchen'. 'Al' = already. 'Nog niet' = not yet. 'Mag ik mee?' = can I come along?",
+      },
+      {
+        speaker: "dutch",
+        dutchText: "Wat voor werk doe je eigenlijk? Of studeer je?",
+        englishHint: "They're asking about your work or studies. Tell them anything — your job, your hobbies, what you study!",
+        expectedResponses: [],
+        feedbackOnWrong: "Try: 'Ik werk als...' (I work as...) or 'Ik studeer...' (I study...) or 'Ik ben met pensioen' (I'm retired).",
+        grammarTip: "'Wat voor werk' = what kind of work. 'Eigenlijk' = actually/by the way. 'Studeren' = to study (at university level).",
+      },
+      {
+        speaker: "dutch",
+        dutchText: "Nou, het was leuk om even te kletsen! Misschien zie ik je nog een keer. Fijne dag verder!",
+        englishHint: "They're saying goodbye! Say anything nice — goodbye, it was nice chatting, see you later!",
+        expectedResponses: [],
+        feedbackOnWrong: "Try: 'Ja leuk! Tot ziens!' or 'Bedankt, jij ook een fijne dag!'",
+        grammarTip: "'Kletsen' = to chat. 'Misschien' = maybe. 'Nog een keer' = another time. 'Fijne dag verder' = have a nice rest of your day.",
       },
     ],
   },

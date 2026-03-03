@@ -89,6 +89,7 @@ const ScenarioPage = () => {
           turns={scenario.conversations}
           scenarioEmoji={scenario.emoji}
           scenarioTitle={scenario.title}
+          openEnded={scenario.openEnded}
           onComplete={() => setCompleted(true)}
         />
       </div>
