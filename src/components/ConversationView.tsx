@@ -50,12 +50,16 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null);
   const [speechRate, setSpeechRate] = useState(0.7);
   const [showAnalysis, setShowAnalysis] = useState(false);
+  const [dynamicTurns, setDynamicTurns] = useState<ConversationTurn[]>([...turns]);
+  const [conversationHistory, setConversationHistory] = useState<Array<{ dutch: string; studentResponse?: string }>>([]);
+  const [isGeneratingTurn, setIsGeneratingTurn] = useState(false);
   const recognitionRef = useRef<any>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  const turn = turns[currentTurn];
-  const progress = ((currentTurn) / turns.length) * 100;
+  const activeTurns = openEnded ? dynamicTurns : turns;
+  const turn = activeTurns[currentTurn];
+  const progress = ((currentTurn) / activeTurns.length) * 100;
 
   const [isSpeaking, setIsSpeaking] = useState(false);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -87,13 +91,20 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
       }
       const audioBlob = await response.blob();
       const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
+      const audio = new Audio();
       currentAudioRef.current = audio;
       audio.onended = () => {
         setIsSpeaking(false);
         URL.revokeObjectURL(audioUrl);
         currentAudioRef.current = null;
       };
+      // Wait for full audio to be ready before playing to prevent clipping
+      audio.preload = "auto";
+      audio.src = audioUrl;
+      await new Promise<void>((resolve, reject) => {
+        audio.oncanplaythrough = () => resolve();
+        audio.onerror = () => reject(new Error("Audio load failed"));
+      });
       await audio.play();
     } catch (e) {
       console.error("ElevenLabs TTS failed, falling back to browser speech:", e);
@@ -129,7 +140,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
           userAnswer: answer,
           dutchPrompt: turn.dutchText,
           englishHint: turn.englishHint,
-          scenarioContext: `${scenarioTitle} - Turn ${currentTurn + 1} of ${turns.length}`,
+          scenarioContext: `${scenarioTitle} - Turn ${currentTurn + 1} of ${activeTurns.length}`,
           imageDescription: turn.imageDescription || null,
           openEnded: openEnded || false,
         },
@@ -141,6 +152,18 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
       
       if (aiFeedback.grade === "perfect" || aiFeedback.grade === "good") {
         setScore((s) => s + 1);
+      }
+
+      // Track conversation history for open-ended scenarios
+      if (openEnded) {
+        setConversationHistory(prev => {
+          const updated = [...prev];
+          // Update the last entry with the student's response
+          if (updated.length > 0) {
+            updated[updated.length - 1] = { ...updated[updated.length - 1], studentResponse: answer };
+          }
+          return updated;
+        });
       }
 
       setFeedback({ userAnswer: answer, aiFeedback });
@@ -166,7 +189,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     } finally {
       setIsEvaluating(false);
     }
-  }, [turn, scenarioTitle, currentTurn, turns.length, openEnded]);
+  }, [turn, scenarioTitle, currentTurn, activeTurns.length, openEnded]);
 
   const startListening = useCallback(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -230,13 +253,67 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     }
   };
 
-  const handleNext = () => {
+  const generateNextTurn = useCallback(async (history: Array<{ dutch: string; studentResponse?: string }>, nextTurnNumber: number) => {
+    setIsGeneratingTurn(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-turn", {
+        body: {
+          conversationHistory: history,
+          turnNumber: nextTurnNumber,
+          totalTurns: activeTurns.length,
+          scenarioContext: scenarioTitle,
+        },
+      });
+
+      if (error) throw error;
+
+      const newTurn: ConversationTurn = {
+        speaker: "dutch",
+        dutchText: data.dutchText,
+        englishHint: data.englishHint,
+        expectedResponses: [],
+        feedbackOnWrong: "Try to respond naturally in Dutch!",
+        grammarTip: data.grammarTip,
+      };
+
+      setDynamicTurns(prev => {
+        const updated = [...prev];
+        updated[nextTurnNumber - 1] = newTurn;
+        return updated;
+      });
+    } catch (e) {
+      console.error("Failed to generate next turn:", e);
+      // Fall back to static turn if available
+    } finally {
+      setIsGeneratingTurn(false);
+    }
+  }, [activeTurns.length, scenarioTitle]);
+
+  // Track conversation history when a new turn starts
+  useEffect(() => {
+    if (openEnded && turn) {
+      setConversationHistory(prev => {
+        // Only add if this turn's dutch text isn't already tracked
+        if (prev.length === currentTurn) {
+          return [...prev, { dutch: turn.dutchText }];
+        }
+        return prev;
+      });
+    }
+  }, [currentTurn, turn, openEnded]);
+
+  const handleNext = async () => {
     setFeedback(null);
     setShowAnalysis(false);
-    if (currentTurn + 1 >= turns.length) {
+    if (currentTurn + 1 >= activeTurns.length) {
       onComplete();
     } else {
-      setCurrentTurn((t) => t + 1);
+      const nextTurnIdx = currentTurn + 1;
+      // For open-ended, generate the next turn dynamically based on conversation
+      if (openEnded && nextTurnIdx >= 1) {
+        await generateNextTurn(conversationHistory, nextTurnIdx + 1);
+      }
+      setCurrentTurn(nextTurnIdx);
     }
   };
 
@@ -261,10 +338,10 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
       <div className="mb-8">
         <div className="mb-2 flex items-center justify-between text-sm">
           <span className="font-display font-bold text-foreground">
-            Turn {currentTurn + 1} of {turns.length}
+            Turn {currentTurn + 1} of {activeTurns.length}
           </span>
           <span className="font-semibold text-primary">
-            Score: {score}/{turns.length}
+            Score: {score}/{activeTurns.length}
           </span>
         </div>
         <div className="h-3 overflow-hidden rounded-full bg-muted">
@@ -298,7 +375,18 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
         </motion.div>
       )}
 
-      {/* Speaker bubble */}
+      {/* Loading state for generating next turn */}
+      {isGeneratingTurn ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="mb-6 flex items-center gap-3 py-8 justify-center"
+        >
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          <p className="text-sm font-medium text-muted-foreground">Generating next question...</p>
+        </motion.div>
+      ) : (
+      /* Speaker bubble */
       <motion.div
         key={currentTurn}
         initial={{ opacity: 0, x: -30 }}
@@ -346,6 +434,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
           </div>
         </div>
       </motion.div>
+      )}
 
       {/* Response area */}
       <AnimatePresence mode="wait">
@@ -580,7 +669,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
                 onClick={handleNext}
                 className="gap-2 rounded-xl bg-gradient-hero text-primary-foreground shadow-primary"
               >
-                {currentTurn + 1 >= turns.length ? "Finish!" : "Next"}
+                {isGeneratingTurn ? "Loading..." : currentTurn + 1 >= activeTurns.length ? "Finish!" : "Next"}
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
