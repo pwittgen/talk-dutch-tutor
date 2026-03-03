@@ -1,8 +1,9 @@
 import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, RotateCcw, ArrowRight, Volume2, Keyboard, Loader2, BookOpen, MessageSquare, Sparkles, Play } from "lucide-react";
+import { Mic, MicOff, RotateCcw, ArrowRight, Volume2, Keyboard, Loader2, BookOpen, MessageSquare, Sparkles, Play, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import { type ConversationTurn } from "@/data/scenarios";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -21,6 +22,8 @@ interface AIFeedback {
   grammarNotes: string[];
   pronunciationTips?: string[];
   vocabularyNotes?: string[];
+  cefrLevel?: string;
+  starRating?: number;
 }
 
 interface FeedbackState {
@@ -44,6 +47,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, onCo
   const [score, setScore] = useState(0);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null);
+  const [speechRate, setSpeechRate] = useState(0.7);
   const recognitionRef = useRef<any>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -177,16 +181,16 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, onCo
   const speakDutch = useCallback((text?: string) => {
     const utterance = new SpeechSynthesisUtterance(text || turn.dutchText);
     utterance.lang = "nl-NL";
-    utterance.rate = 0.7;
-    utterance.pitch = 1.1;
-    // Try to find a female Dutch voice for a friendlier tone
+    utterance.rate = speechRate;
+    utterance.pitch = 1.0;
+    // Try to find a friendly Dutch voice
     const voices = speechSynthesis.getVoices();
     const dutchVoice = voices.find(
       (v) => v.lang.startsWith("nl") && v.name.toLowerCase().includes("female")
     ) || voices.find((v) => v.lang.startsWith("nl"));
     if (dutchVoice) utterance.voice = dutchVoice;
     speechSynthesis.speak(utterance);
-  }, [turn]);
+  }, [turn, speechRate]);
 
   const playRecording = useCallback(() => {
     if (recordedAudioUrl) {
@@ -257,11 +261,25 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, onCo
               </p>
               <button
                 onClick={() => speakDutch()}
-                className="mt-2 flex items-center gap-1 text-sm font-medium text-secondary hover:text-secondary/80 transition-colors"
-              >
-                <Volume2 className="h-4 w-4" />
-                Listen
-              </button>
+                  className="mt-2 flex items-center gap-1 text-sm font-medium text-secondary hover:text-secondary/80 transition-colors"
+                >
+                  <Volume2 className="h-4 w-4" />
+                  Listen
+                </button>
+                {/* Speed control */}
+                <div className="mt-3 flex items-center gap-3">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">🐢 Slow</span>
+                  <Slider
+                    value={[speechRate]}
+                    onValueChange={(v) => setSpeechRate(v[0])}
+                    min={0.5}
+                    max={1.3}
+                    step={0.1}
+                    className="flex-1"
+                  />
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">Fast 🐇</span>
+                  <span className="text-xs font-mono text-muted-foreground w-8">{speechRate.toFixed(1)}x</span>
+                </div>
             </div>
             <p className="mt-3 rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground italic">
               💡 {turn.englishHint}
@@ -378,7 +396,33 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, onCo
                 <p className={`font-display text-lg font-bold ${gradeConfig[feedback.aiFeedback.grade].color}`}>
                   {gradeConfig[feedback.aiFeedback.grade].emoji} {gradeConfig[feedback.aiFeedback.grade].label}
                 </p>
+                {/* CEFR Level Badge */}
+                {feedback.aiFeedback.cefrLevel && (
+                  <span className="ml-auto rounded-full bg-secondary/20 px-3 py-0.5 text-xs font-bold text-secondary">
+                    {feedback.aiFeedback.cefrLevel}
+                  </span>
+                )}
               </div>
+
+              {/* Star Rating */}
+              {feedback.aiFeedback.starRating && (
+                <div className="flex items-center gap-1 mb-2">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Star
+                      key={s}
+                      className={`h-5 w-5 ${
+                        s <= (feedback.aiFeedback.starRating || 0)
+                          ? "fill-amber-400 text-amber-400"
+                          : "text-muted-foreground/30"
+                      }`}
+                    />
+                  ))}
+                  <span className="ml-1 text-sm text-muted-foreground">
+                    {feedback.aiFeedback.starRating}/5
+                  </span>
+                </div>
+              )}
+
               <p className="text-foreground">{feedback.aiFeedback.feedback}</p>
 
               {/* Corrected Dutch */}
