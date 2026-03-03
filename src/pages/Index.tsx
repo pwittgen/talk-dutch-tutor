@@ -1,10 +1,13 @@
 import { motion } from "framer-motion";
-import { Mic, BookOpen, MessageCircle } from "lucide-react";
-import { scenarios } from "@/data/scenarios";
+import { Mic, BookOpen, MessageCircle, BarChart3 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { scenarios, sections } from "@/data/scenarios";
 import ScenarioCard from "@/components/ScenarioCard";
 import heroImage from "@/assets/hero-dutch.jpg";
 
 const Index = () => {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
@@ -55,27 +58,40 @@ const Index = () => {
                 <span className="text-sm font-semibold text-foreground">{label}</span>
               </div>
             ))}
+            <button
+              onClick={() => navigate("/progress")}
+              className="flex items-center gap-2 rounded-full bg-card px-4 py-2 shadow-card hover:shadow-card-hover transition-shadow"
+            >
+              <BarChart3 className="h-4 w-4 text-secondary" />
+              <span className="text-sm font-semibold text-foreground">My Progress</span>
+            </button>
           </motion.div>
         </div>
       </section>
 
-      {/* Scenarios Grid */}
-      <section className="mx-auto max-w-5xl px-4 pb-20">
-        <div className="mb-8">
-          <h2 className="font-display text-2xl font-black text-foreground">
-            Choose a Scenario
-          </h2>
-          <p className="mt-1 text-muted-foreground">
-            Pick an everyday situation and start practicing Dutch
-          </p>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {scenarios.map((scenario, i) => (
-            <ScenarioCard key={scenario.id} scenario={scenario} index={i} />
-          ))}
-        </div>
-      </section>
+      {/* Scenario Sections */}
+      <div className="mx-auto max-w-5xl px-4 pb-20 space-y-16">
+        {sections.map((section) => {
+          const sectionScenarios = scenarios.filter((s) => s.section === section.id);
+          if (sectionScenarios.length === 0) return null;
+          return (
+            <section key={section.id}>
+              <div className="mb-6">
+                <h2 className="font-display text-2xl font-black text-foreground flex items-center gap-2">
+                  <span>{section.emoji}</span> {section.title}
+                </h2>
+                <p className="mt-0.5 text-sm font-medium text-secondary italic">{section.dutchTitle}</p>
+                <p className="mt-1 text-muted-foreground">{section.description}</p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {sectionScenarios.map((scenario, i) => (
+                  <ScenarioCard key={scenario.id} scenario={scenario} index={i} />
+                ))}
+              </div>
+            </section>
+          );
+        })}
+      </div>
 
       {/* Footer */}
       <footer className="border-t border-border py-8 text-center">

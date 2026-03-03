@@ -1,15 +1,18 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Trophy } from "lucide-react";
+import { ArrowLeft, Trophy, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { scenarios } from "@/data/scenarios";
 import ConversationView from "@/components/ConversationView";
+import { useProgress, useMutePreference } from "@/hooks/useProgress";
 
 const ScenarioPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [completed, setCompleted] = useState(false);
+  const { recordCompletion } = useProgress();
+  const { muted, toggleMute } = useMutePreference();
 
   const scenario = scenarios.find((s) => s.id === id);
 
@@ -20,6 +23,11 @@ const ScenarioPage = () => {
       </div>
     );
   }
+
+  const handleComplete = () => {
+    recordCompletion(scenario.id);
+    setCompleted(true);
+  };
 
   if (completed) {
     return (
@@ -43,9 +51,7 @@ const ScenarioPage = () => {
           </p>
           <div className="mt-8 flex flex-col gap-3">
             <Button
-              onClick={() => {
-                setCompleted(false);
-              }}
+              onClick={() => setCompleted(false)}
               className="rounded-xl bg-gradient-hero text-primary-foreground shadow-primary"
             >
               Practice Again
@@ -56,6 +62,13 @@ const ScenarioPage = () => {
               className="rounded-xl"
             >
               Back to Scenarios
+            </Button>
+            <Button
+              onClick={() => navigate("/progress")}
+              variant="ghost"
+              className="rounded-xl"
+            >
+              View My Progress
             </Button>
           </div>
         </motion.div>
@@ -74,12 +87,19 @@ const ScenarioPage = () => {
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <div>
+          <div className="flex-1">
             <h1 className="font-display text-lg font-bold text-foreground">
               {scenario.emoji} {scenario.title}
             </h1>
             <p className="text-sm text-secondary font-medium italic">{scenario.dutchTitle}</p>
           </div>
+          <button
+            onClick={toggleMute}
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            title={muted ? "Unmute auto-play" : "Mute auto-play"}
+          >
+            {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+          </button>
         </div>
       </div>
 
@@ -90,7 +110,8 @@ const ScenarioPage = () => {
           scenarioEmoji={scenario.emoji}
           scenarioTitle={scenario.title}
           openEnded={scenario.openEnded}
-          onComplete={() => setCompleted(true)}
+          muted={muted}
+          onComplete={handleComplete}
         />
       </div>
     </div>
