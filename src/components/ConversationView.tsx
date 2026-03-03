@@ -1,6 +1,6 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, RotateCcw, ArrowRight, Volume2, Keyboard, Loader2, BookOpen, MessageSquare, Sparkles, Play, Star } from "lucide-react";
+import { Mic, MicOff, RotateCcw, ArrowRight, Volume2, VolumeX, Keyboard, Loader2, BookOpen, MessageSquare, Sparkles, Play, Star, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
@@ -12,6 +12,7 @@ interface ConversationViewProps {
   scenarioEmoji: string;
   scenarioTitle: string;
   openEnded?: boolean;
+  muted: boolean;
   onComplete: () => void;
 }
 
@@ -38,7 +39,7 @@ const gradeConfig = {
   incorrect: { emoji: "🔄", label: "Let's try again", color: "text-destructive", bg: "bg-destructive/10 border-destructive/20" },
 };
 
-const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, onComplete }: ConversationViewProps) => {
+const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, muted, onComplete }: ConversationViewProps) => {
   const [currentTurn, setCurrentTurn] = useState(0);
   const [isListening, setIsListening] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
@@ -48,12 +49,36 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, onCo
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null);
   const [speechRate, setSpeechRate] = useState(0.7);
+  const [showAnalysis, setShowAnalysis] = useState(false);
   const recognitionRef = useRef<any>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
   const turn = turns[currentTurn];
   const progress = ((currentTurn) / turns.length) * 100;
+
+  const speakDutch = useCallback((text?: string) => {
+    if (muted) return;
+    const utterance = new SpeechSynthesisUtterance(text || turn.dutchText);
+    utterance.lang = "nl-NL";
+    utterance.rate = speechRate;
+    utterance.pitch = 1.0;
+    const voices = speechSynthesis.getVoices();
+    const dutchVoice = voices.find(
+      (v) => v.lang.startsWith("nl") && v.name.toLowerCase().includes("female")
+    ) || voices.find((v) => v.lang.startsWith("nl"));
+    if (dutchVoice) utterance.voice = dutchVoice;
+    speechSynthesis.speak(utterance);
+  }, [turn, speechRate, muted]);
+
+  // Auto-play dialogue when turn changes
+  useEffect(() => {
+    if (!muted && turn) {
+      // Small delay so the UI renders first
+      const timeout = setTimeout(() => speakDutch(), 600);
+      return () => clearTimeout(timeout);
+    }
+  }, [currentTurn, muted]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const evaluateWithAI = useCallback(async (answer: string) => {
     setIsEvaluating(true);
@@ -78,9 +103,9 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, onCo
       }
 
       setFeedback({ userAnswer: answer, aiFeedback });
+      setShowAnalysis(false);
     } catch (e) {
       console.error("AI evaluation failed, using fallback:", e);
-      // Fallback to basic check
       const normalized = answer.toLowerCase().replace(/[?.!,]/g, "").trim();
       const isCorrect = turn.expectedResponses.some((expected) => {
         const ne = expected.toLowerCase().replace(/[?.!,]/g, "").trim();
@@ -92,14 +117,15 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, onCo
         aiFeedback: {
           grade: isCorrect ? "good" : "incorrect",
           feedback: isCorrect ? "Heel goed! Great job!" : turn.feedbackOnWrong,
-          correctedDutch: turn.expectedResponses[0],
+          correctedDutch: turn.expectedResponses[0] || answer,
           grammarNotes: turn.grammarTip ? [turn.grammarTip] : [],
         },
       });
+      setShowAnalysis(false);
     } finally {
       setIsEvaluating(false);
     }
-  }, [turn, scenarioTitle, currentTurn, turns.length]);
+  }, [turn, scenarioTitle, currentTurn, turns.length, openEnded]);
 
   const startListening = useCallback(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -108,7 +134,6 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, onCo
       return;
     }
 
-    // Start audio recording for playback
     navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
       const mediaRecorder = new MediaRecorder(stream);
       audioChunksRef.current = [];
@@ -166,6 +191,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, onCo
 
   const handleNext = () => {
     setFeedback(null);
+    setShowAnalysis(false);
     if (currentTurn + 1 >= turns.length) {
       onComplete();
     } else {
@@ -175,22 +201,9 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, onCo
 
   const handleRetry = () => {
     setFeedback(null);
+    setShowAnalysis(false);
     setRecordedAudioUrl(null);
   };
-
-  const speakDutch = useCallback((text?: string) => {
-    const utterance = new SpeechSynthesisUtterance(text || turn.dutchText);
-    utterance.lang = "nl-NL";
-    utterance.rate = speechRate;
-    utterance.pitch = 1.0;
-    // Try to find a friendly Dutch voice
-    const voices = speechSynthesis.getVoices();
-    const dutchVoice = voices.find(
-      (v) => v.lang.startsWith("nl") && v.name.toLowerCase().includes("female")
-    ) || voices.find((v) => v.lang.startsWith("nl"));
-    if (dutchVoice) utterance.voice = dutchVoice;
-    speechSynthesis.speak(utterance);
-  }, [turn, speechRate]);
 
   const playRecording = useCallback(() => {
     if (recordedAudioUrl) {
@@ -198,6 +211,8 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, onCo
       audio.play();
     }
   }, [recordedAudioUrl]);
+
+  const isWrong = feedback && (feedback.aiFeedback.grade === "incorrect" || feedback.aiFeedback.grade === "needs_improvement");
 
   return (
     <div className="flex min-h-[70vh] flex-col">
@@ -259,27 +274,29 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, onCo
               <p className="font-display text-lg font-bold text-foreground">
                 {turn.dutchText}
               </p>
-              <button
-                onClick={() => speakDutch()}
-                  className="mt-2 flex items-center gap-1 text-sm font-medium text-secondary hover:text-secondary/80 transition-colors"
+              <div className="mt-2 flex items-center gap-3">
+                <button
+                  onClick={() => speakDutch()}
+                  className="flex items-center gap-1 text-sm font-medium text-secondary hover:text-secondary/80 transition-colors"
                 >
-                  <Volume2 className="h-4 w-4" />
-                  Listen
+                  {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                  {muted ? "Muted" : "Listen"}
                 </button>
-                {/* Speed control */}
-                <div className="mt-3 flex items-center gap-3">
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">🐢 Slow</span>
-                  <Slider
-                    value={[speechRate]}
-                    onValueChange={(v) => setSpeechRate(v[0])}
-                    min={0.5}
-                    max={1.3}
-                    step={0.1}
-                    className="flex-1"
-                  />
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">Fast 🐇</span>
-                  <span className="text-xs font-mono text-muted-foreground w-8">{speechRate.toFixed(1)}x</span>
-                </div>
+              </div>
+              {/* Speed control */}
+              <div className="mt-3 flex items-center gap-3">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">🐢 Slow</span>
+                <Slider
+                  value={[speechRate]}
+                  onValueChange={(v) => setSpeechRate(v[0])}
+                  min={0.5}
+                  max={1.3}
+                  step={0.1}
+                  className="flex-1"
+                />
+                <span className="text-xs text-muted-foreground whitespace-nowrap">Fast 🐇</span>
+                <span className="text-xs font-mono text-muted-foreground w-8">{speechRate.toFixed(1)}x</span>
+              </div>
             </div>
             <p className="mt-3 rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground italic">
               💡 {turn.englishHint}
@@ -445,53 +462,69 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, onCo
                 </p>
               </div>
 
-              {/* Grammar Notes */}
-              {feedback.aiFeedback.grammarNotes.length > 0 && (
-                <div className="mt-3 rounded-xl bg-card p-4">
-                  <p className="text-sm font-semibold text-secondary">
-                    <BookOpen className="inline h-4 w-4 mr-1" />
-                    Grammar Notes
-                  </p>
-                  <ul className="mt-1 space-y-1">
-                    {feedback.aiFeedback.grammarNotes.map((note, i) => (
-                      <li key={i} className="text-sm text-foreground">• {note}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              {/* Collapsible analysis - hidden by default for wrong answers */}
+              {isWrong && !showAnalysis ? (
+                <button
+                  onClick={() => setShowAnalysis(true)}
+                  className="mt-3 flex w-full items-center justify-center gap-1 rounded-xl bg-card p-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <ChevronDown className="h-4 w-4" />
+                  Show detailed analysis
+                </button>
+              ) : null}
 
-              {/* Pronunciation Tips */}
-              {feedback.aiFeedback.pronunciationTips && feedback.aiFeedback.pronunciationTips.length > 0 && (
-                <div className="mt-3 rounded-xl bg-card p-4">
-                  <p className="text-sm font-semibold text-primary">
-                    🗣️ Pronunciation Tips
-                  </p>
-                  <ul className="mt-1 space-y-1">
-                    {feedback.aiFeedback.pronunciationTips.map((tip, i) => (
-                      <li key={i} className="text-sm text-foreground">• {tip}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              {/* Analysis content - always show for correct answers, toggle for wrong */}
+              {(!isWrong || showAnalysis) && (
+                <>
+                  {/* Grammar Notes */}
+                  {feedback.aiFeedback.grammarNotes.length > 0 && (
+                    <div className="mt-3 rounded-xl bg-card p-4">
+                      <p className="text-sm font-semibold text-secondary">
+                        <BookOpen className="inline h-4 w-4 mr-1" />
+                        Grammar Notes
+                      </p>
+                      <ul className="mt-1 space-y-1">
+                        {feedback.aiFeedback.grammarNotes.map((note, i) => (
+                          <li key={i} className="text-sm text-foreground">• {note}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
-              {/* Vocabulary Notes */}
-              {feedback.aiFeedback.vocabularyNotes && feedback.aiFeedback.vocabularyNotes.length > 0 && (
-                <div className="mt-3 rounded-xl bg-card p-4">
-                  <p className="text-sm font-semibold text-accent-foreground">
-                    📖 Vocabulary
-                  </p>
-                  <ul className="mt-1 space-y-1">
-                    {feedback.aiFeedback.vocabularyNotes.map((note, i) => (
-                      <li key={i} className="text-sm text-foreground">• {note}</li>
-                    ))}
-                  </ul>
-                </div>
+                  {/* Pronunciation Tips */}
+                  {feedback.aiFeedback.pronunciationTips && feedback.aiFeedback.pronunciationTips.length > 0 && (
+                    <div className="mt-3 rounded-xl bg-card p-4">
+                      <p className="text-sm font-semibold text-primary">
+                        🗣️ Pronunciation Tips
+                      </p>
+                      <ul className="mt-1 space-y-1">
+                        {feedback.aiFeedback.pronunciationTips.map((tip, i) => (
+                          <li key={i} className="text-sm text-foreground">• {tip}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Vocabulary Notes */}
+                  {feedback.aiFeedback.vocabularyNotes && feedback.aiFeedback.vocabularyNotes.length > 0 && (
+                    <div className="mt-3 rounded-xl bg-card p-4">
+                      <p className="text-sm font-semibold text-accent">
+                        📖 Vocabulary
+                      </p>
+                      <ul className="mt-1 space-y-1">
+                        {feedback.aiFeedback.vocabularyNotes.map((note, i) => (
+                          <li key={i} className="text-sm text-foreground">• {note}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
             {/* Action buttons */}
             <div className="flex justify-center gap-3 pt-2">
-              {(feedback.aiFeedback.grade === "incorrect" || feedback.aiFeedback.grade === "needs_improvement") && (
+              {isWrong && (
                 <Button
                   onClick={handleRetry}
                   variant="outline"
