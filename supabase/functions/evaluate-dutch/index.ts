@@ -108,8 +108,17 @@ Evaluate this response. Return your evaluation using the evaluate_response funct
                       items: { type: "string" },
                       description: "Vocabulary suggestions or alternatives (max 2)",
                     },
+                    cefrLevel: {
+                      type: "string",
+                      enum: ["A1", "A2", "B1", "B2", "C1", "C2"],
+                      description: "The CEFR level this response corresponds to based on vocabulary, grammar complexity, and fluency",
+                    },
+                    starRating: {
+                      type: "number",
+                      description: "Star rating from 1 to 5 for overall correctness (1=very poor, 2=poor, 3=okay, 4=good, 5=excellent)",
+                    },
                   },
-                  required: ["grade", "feedback", "correctedDutch", "grammarNotes"],
+                  required: ["grade", "feedback", "correctedDutch", "grammarNotes", "cefrLevel", "starRating"],
                   additionalProperties: false,
                 },
               },
