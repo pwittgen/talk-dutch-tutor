@@ -1,10 +1,24 @@
+import supermarketImg from "@/assets/scenarios/supermarket.jpg";
+import bakeryImg from "@/assets/scenarios/bakery.jpg";
+import trainImg from "@/assets/scenarios/train.jpg";
+import restaurantImg from "@/assets/scenarios/restaurant.jpg";
+import doctorImg from "@/assets/scenarios/doctor.jpg";
+import directionsImg from "@/assets/scenarios/directions.jpg";
+import cafeImg from "@/assets/scenarios/cafe.jpg";
+import postOfficeImg from "@/assets/scenarios/post-office.jpg";
+import marketImg from "@/assets/scenarios/market.jpg";
+import hotelImg from "@/assets/scenarios/hotel.jpg";
+
 export interface ConversationTurn {
-  speaker: "dutch"; // the Dutch speaker
+  speaker: "dutch";
   dutchText: string;
   englishHint: string;
-  expectedResponses: string[]; // acceptable Dutch responses (lowercase)
+  imageUrl?: string;
+  imageDescription?: string;
   feedbackOnWrong: string;
   grammarTip?: string;
+  // Legacy field kept for fallback
+  expectedResponses: string[];
 }
 
 export interface Scenario {
@@ -15,6 +29,7 @@ export interface Scenario {
   description: string;
   difficulty: "beginner" | "easy" | "medium";
   color: "orange" | "blue" | "teal";
+  scenarioImage: string;
   conversations: ConversationTurn[];
 }
 
@@ -27,11 +42,14 @@ export const scenarios: Scenario[] = [
     description: "Buy groceries and ask where things are",
     difficulty: "beginner",
     color: "orange",
+    scenarioImage: supermarketImg,
     conversations: [
       {
         speaker: "dutch",
         dutchText: "Hallo! Kan ik u helpen?",
-        englishHint: "The shopkeeper greets you. Say 'Yes please, where is the bread?'",
+        englishHint: "The shopkeeper greets you. Look at the image — you see shelves of bread and milk. Ask where the bread is.",
+        imageUrl: supermarketImg,
+        imageDescription: "A Dutch supermarket aisle with shelves full of bread, milk, cheese, and a shopping cart in the center.",
         expectedResponses: ["ja graag, waar is het brood", "ja, waar is het brood", "waar is het brood"],
         feedbackOnWrong: "Try: 'Ja graag, waar is het brood?'",
         grammarTip: "'Waar is' means 'where is'. 'Het brood' uses 'het' because brood is a neuter noun.",
@@ -39,7 +57,7 @@ export const scenarios: Scenario[] = [
       {
         speaker: "dutch",
         dutchText: "Het brood is in gangpad drie. Heeft u nog iets nodig?",
-        englishHint: "They told you aisle 3. Say 'Yes, I also need milk'",
+        englishHint: "They told you aisle 3. You can see milk in the cooler section. Say you also need milk.",
         expectedResponses: ["ja, ik heb ook melk nodig", "ja ik heb ook melk nodig", "ik heb ook melk nodig"],
         feedbackOnWrong: "Try: 'Ja, ik heb ook melk nodig'",
         grammarTip: "'Ik heb ... nodig' means 'I need ...'. 'Ook' means 'also' and goes before the object.",
@@ -47,7 +65,7 @@ export const scenarios: Scenario[] = [
       {
         speaker: "dutch",
         dutchText: "Melk staat in de koeling, achterin de winkel. Is dat alles?",
-        englishHint: "Ask 'How much does it cost?'",
+        englishHint: "Ask how much it costs.",
         expectedResponses: ["hoeveel kost het", "hoeveel kost dat", "wat kost het"],
         feedbackOnWrong: "Try: 'Hoeveel kost het?'",
         grammarTip: "'Hoeveel kost het?' is the standard way to ask 'How much does it cost?'",
@@ -78,12 +96,15 @@ export const scenarios: Scenario[] = [
     description: "Order fresh bread and pastries",
     difficulty: "beginner",
     color: "blue",
+    scenarioImage: bakeryImg,
     conversations: [
       {
         speaker: "dutch",
         dutchText: "Goedemorgen! Wat mag het zijn?",
-        englishHint: "Say 'Good morning, I would like two croissants please'",
-        expectedResponses: ["goedemorgen, ik wil graag twee croissants", "goedemorgen ik wil graag twee croissants", "twee croissants alstublieft"],
+        englishHint: "Look at the image — you see fresh croissants and bread. Order two croissants.",
+        imageUrl: bakeryImg,
+        imageDescription: "A cozy Dutch bakery counter with rows of fresh golden croissants and various bread loaves.",
+        expectedResponses: ["goedemorgen, ik wil graag twee croissants", "twee croissants alstublieft"],
         feedbackOnWrong: "Try: 'Goedemorgen, ik wil graag twee croissants'",
         grammarTip: "'Ik wil graag' means 'I would like'. 'Twee' = two.",
       },
@@ -91,7 +112,7 @@ export const scenarios: Scenario[] = [
         speaker: "dutch",
         dutchText: "Twee croissants, goed. Wilt u er nog iets bij?",
         englishHint: "Say 'Yes, one brown bread please'",
-        expectedResponses: ["ja, een bruin brood alstublieft", "ja een bruin brood alstublieft", "een bruin brood alstublieft"],
+        expectedResponses: ["ja, een bruin brood alstublieft", "een bruin brood alstublieft"],
         feedbackOnWrong: "Try: 'Ja, een bruin brood alstublieft'",
         grammarTip: "'Alstublieft' is the formal 'please'. 'Bruin brood' = brown/whole wheat bread.",
       },
@@ -99,7 +120,7 @@ export const scenarios: Scenario[] = [
         speaker: "dutch",
         dutchText: "Een bruin brood. Gesneden of niet?",
         englishHint: "Say 'Sliced please'",
-        expectedResponses: ["gesneden alstublieft", "gesneden graag", "ja gesneden alstublieft"],
+        expectedResponses: ["gesneden alstublieft", "gesneden graag"],
         feedbackOnWrong: "Try: 'Gesneden alstublieft'",
         grammarTip: "'Gesneden' means 'sliced'. It comes from the verb 'snijden' (to cut).",
       },
@@ -115,7 +136,7 @@ export const scenarios: Scenario[] = [
         speaker: "dutch",
         dutchText: "Ja natuurlijk! Alstublieft. Fijne dag!",
         englishHint: "Say 'Thank you, you too!'",
-        expectedResponses: ["dank u wel, u ook", "bedankt, u ook", "dank u u ook"],
+        expectedResponses: ["dank u wel, u ook", "bedankt, u ook"],
         feedbackOnWrong: "Try: 'Dank u wel, u ook!'",
         grammarTip: "'U ook' means 'you too' (formal). Informal would be 'jij ook'.",
       },
@@ -129,20 +150,23 @@ export const scenarios: Scenario[] = [
     description: "Buy a ticket and find your platform",
     difficulty: "easy",
     color: "teal",
+    scenarioImage: trainImg,
     conversations: [
       {
         speaker: "dutch",
         dutchText: "Welkom bij NS. Waar wilt u naartoe?",
-        englishHint: "Say 'I want to go to Amsterdam'",
-        expectedResponses: ["ik wil naar amsterdam", "naar amsterdam alstublieft", "ik wil graag naar amsterdam"],
+        englishHint: "Look at the image — you see a yellow Dutch train at the platform. Tell them you want to go to Amsterdam.",
+        imageUrl: trainImg,
+        imageDescription: "A Dutch NS train station platform with a yellow train, departure board showing destinations, and platform signage.",
+        expectedResponses: ["ik wil naar amsterdam", "naar amsterdam alstublieft"],
         feedbackOnWrong: "Try: 'Ik wil naar Amsterdam'",
-        grammarTip: "'Naar' means 'to' when indicating direction. 'Naartoe' is used at the end of questions.",
+        grammarTip: "'Naar' means 'to' when indicating direction.",
       },
       {
         speaker: "dutch",
         dutchText: "Enkele reis of retour?",
         englishHint: "Say 'Return please'",
-        expectedResponses: ["retour alstublieft", "een retour alstublieft", "retour graag"],
+        expectedResponses: ["retour alstublieft", "een retour alstublieft"],
         feedbackOnWrong: "Try: 'Retour alstublieft'",
         grammarTip: "'Enkele reis' = one-way, 'retour' = return ticket.",
       },
@@ -158,17 +182,17 @@ export const scenarios: Scenario[] = [
         speaker: "dutch",
         dutchText: "Dat is veertien euro. Van welk spoor vertrekt de trein?",
         englishHint: "Ask 'Which platform does the train leave from?'",
-        expectedResponses: ["van welk spoor vertrekt de trein", "welk spoor", "van welk spoor"],
+        expectedResponses: ["van welk spoor vertrekt de trein", "welk spoor"],
         feedbackOnWrong: "Try: 'Van welk spoor vertrekt de trein?'",
-        grammarTip: "'Spoor' = platform/track. 'Vertrekt' = departs, from 'vertrekken'.",
+        grammarTip: "'Spoor' = platform/track. 'Vertrekt' = departs.",
       },
       {
         speaker: "dutch",
         dutchText: "Spoor vijf. De trein vertrekt over tien minuten. Goede reis!",
         englishHint: "Say 'Thank you, goodbye!'",
-        expectedResponses: ["dank u wel, tot ziens", "bedankt, tot ziens", "dank u wel"],
+        expectedResponses: ["dank u wel, tot ziens", "bedankt, tot ziens"],
         feedbackOnWrong: "Try: 'Dank u wel, tot ziens!'",
-        grammarTip: "'Goede reis' means 'have a good trip'. A nice reply could include 'dank u wel'.",
+        grammarTip: "'Goede reis' means 'have a good trip'.",
       },
     ],
   },
@@ -180,12 +204,15 @@ export const scenarios: Scenario[] = [
     description: "Order food and drinks at a cozy Dutch restaurant",
     difficulty: "easy",
     color: "orange",
+    scenarioImage: restaurantImg,
     conversations: [
       {
         speaker: "dutch",
         dutchText: "Goedenavond! Heeft u gereserveerd?",
-        englishHint: "Say 'Good evening, yes, under the name...' or 'No, a table for two please'",
-        expectedResponses: ["nee, een tafel voor twee alstublieft", "een tafel voor twee", "nee een tafel voor twee alstublieft"],
+        englishHint: "Look at the image — you see a nicely set table with wine glasses and candles. Say you don't have a reservation and ask for a table for two.",
+        imageUrl: restaurantImg,
+        imageDescription: "A cozy Dutch restaurant interior with elegantly set tables, wine glasses, menu cards, and warm candlelight.",
+        expectedResponses: ["nee, een tafel voor twee alstublieft", "een tafel voor twee"],
         feedbackOnWrong: "Try: 'Nee, een tafel voor twee alstublieft'",
         grammarTip: "'Een tafel voor twee' = 'a table for two'. 'Gereserveerd' = reserved.",
       },
@@ -193,7 +220,7 @@ export const scenarios: Scenario[] = [
         speaker: "dutch",
         dutchText: "Natuurlijk, komt u maar mee. Hier is de menukaart. Wilt u iets drinken?",
         englishHint: "Order a drink: 'A glass of water please'",
-        expectedResponses: ["een glas water alstublieft", "water alstublieft", "een glas water graag"],
+        expectedResponses: ["een glas water alstublieft", "water alstublieft"],
         feedbackOnWrong: "Try: 'Een glas water alstublieft'",
         grammarTip: "'Een glas' = a glass. Dutch uses 'het water' (neuter noun).",
       },
@@ -201,15 +228,15 @@ export const scenarios: Scenario[] = [
         speaker: "dutch",
         dutchText: "Een glas water. Weet u al wat u wilt eten?",
         englishHint: "Say 'I would like the soup of the day'",
-        expectedResponses: ["ik wil graag de soep van de dag", "de soep van de dag alstublieft", "ik wil de soep van de dag"],
+        expectedResponses: ["ik wil graag de soep van de dag", "de soep van de dag alstublieft"],
         feedbackOnWrong: "Try: 'Ik wil graag de soep van de dag'",
-        grammarTip: "'Soep van de dag' = soup of the day. 'Ik wil graag' = I would like.",
+        grammarTip: "'Soep van de dag' = soup of the day.",
       },
       {
         speaker: "dutch",
         dutchText: "Goede keuze! En als hoofdgerecht?",
         englishHint: "Say 'The fish with vegetables please'",
-        expectedResponses: ["de vis met groenten alstublieft", "vis met groenten alstublieft", "ik wil graag de vis met groenten"],
+        expectedResponses: ["de vis met groenten alstublieft", "ik wil graag de vis met groenten"],
         feedbackOnWrong: "Try: 'De vis met groenten alstublieft'",
         grammarTip: "'Hoofdgerecht' = main course. 'Met' = with. 'Groenten' = vegetables.",
       },
@@ -217,7 +244,7 @@ export const scenarios: Scenario[] = [
         speaker: "dutch",
         dutchText: "Uitstekend! Eet smakelijk!",
         englishHint: "Say 'Thank you!'",
-        expectedResponses: ["dank u wel", "bedankt", "dank u"],
+        expectedResponses: ["dank u wel", "bedankt"],
         feedbackOnWrong: "Try: 'Dank u wel!'",
         grammarTip: "'Eet smakelijk' means 'enjoy your meal' — like 'bon appétit'!",
       },
@@ -231,12 +258,15 @@ export const scenarios: Scenario[] = [
     description: "Describe symptoms and understand advice",
     difficulty: "medium",
     color: "blue",
+    scenarioImage: doctorImg,
     conversations: [
       {
         speaker: "dutch",
         dutchText: "Goedemorgen, wat kan ik voor u doen?",
-        englishHint: "Say 'I don't feel well, I have a headache'",
-        expectedResponses: ["ik voel me niet goed, ik heb hoofdpijn", "ik heb hoofdpijn", "ik voel me niet lekker ik heb hoofdpijn"],
+        englishHint: "Look at the image — you're in a doctor's waiting room. Tell the doctor you don't feel well and have a headache.",
+        imageUrl: doctorImg,
+        imageDescription: "A Dutch doctor's office waiting room with a reception desk, medical posters on the walls, and chairs.",
+        expectedResponses: ["ik voel me niet goed, ik heb hoofdpijn", "ik heb hoofdpijn"],
         feedbackOnWrong: "Try: 'Ik voel me niet goed, ik heb hoofdpijn'",
         grammarTip: "'Ik voel me' = I feel (reflexive verb). 'Hoofdpijn' = headache (hoofd + pijn).",
       },
@@ -246,7 +276,7 @@ export const scenarios: Scenario[] = [
         englishHint: "Say 'Since yesterday'",
         expectedResponses: ["sinds gisteren", "sinds gisteren al"],
         feedbackOnWrong: "Try: 'Sinds gisteren'",
-        grammarTip: "'Sinds' = since. 'Gisteren' = yesterday. 'Vandaag' = today.",
+        grammarTip: "'Sinds' = since. 'Gisteren' = yesterday.",
       },
       {
         speaker: "dutch",
@@ -268,9 +298,9 @@ export const scenarios: Scenario[] = [
         speaker: "dutch",
         dutchText: "De apotheek is om de hoek. Beterschap!",
         englishHint: "Say 'Thank you, doctor'",
-        expectedResponses: ["dank u wel, dokter", "bedankt dokter", "dank u wel dokter"],
+        expectedResponses: ["dank u wel, dokter", "bedankt dokter"],
         feedbackOnWrong: "Try: 'Dank u wel, dokter'",
-        grammarTip: "'Beterschap' means 'get well soon'. It's a common Dutch well-wish!",
+        grammarTip: "'Beterschap' means 'get well soon'.",
       },
     ],
   },
@@ -282,12 +312,15 @@ export const scenarios: Scenario[] = [
     description: "Find your way around a Dutch city",
     difficulty: "easy",
     color: "teal",
+    scenarioImage: directionsImg,
     conversations: [
       {
         speaker: "dutch",
         dutchText: "Hallo! Zoekt u iets?",
-        englishHint: "Say 'Yes, where is the museum?'",
-        expectedResponses: ["ja, waar is het museum", "waar is het museum", "ja waar is het museum"],
+        englishHint: "Look at the image — you see an Amsterdam street with canals and bicycles. Ask where the museum is.",
+        imageUrl: directionsImg,
+        imageDescription: "An Amsterdam street scene with a canal, stone bridge, parked bicycles, and historic Dutch buildings.",
+        expectedResponses: ["ja, waar is het museum", "waar is het museum"],
         feedbackOnWrong: "Try: 'Ja, waar is het museum?'",
         grammarTip: "'Zoekt u' = are you looking for. 'Het museum' uses 'het' (neuter).",
       },
@@ -295,7 +328,7 @@ export const scenarios: Scenario[] = [
         speaker: "dutch",
         dutchText: "Het museum? Dat is niet ver. Ga rechtdoor en dan links.",
         englishHint: "Say 'Is it far from here?'",
-        expectedResponses: ["is het ver hiervandaan", "is het ver", "is het ver van hier"],
+        expectedResponses: ["is het ver hiervandaan", "is het ver"],
         feedbackOnWrong: "Try: 'Is het ver hiervandaan?'",
         grammarTip: "'Hiervandaan' = from here. 'Rechtdoor' = straight ahead. 'Links' = left.",
       },
@@ -313,13 +346,13 @@ export const scenarios: Scenario[] = [
         englishHint: "Ask 'How much does a ticket cost?'",
         expectedResponses: ["hoeveel kost een kaartje", "wat kost een kaartje"],
         feedbackOnWrong: "Try: 'Hoeveel kost een kaartje?'",
-        grammarTip: "'Kaartje' = ticket (diminutive of 'kaart'). Dutch loves diminutives (-je, -tje)!",
+        grammarTip: "'Kaartje' = ticket (diminutive of 'kaart').",
       },
       {
         speaker: "dutch",
         dutchText: "Ik denk twaalf euro. Veel plezier!",
         englishHint: "Say 'Thank you, have a nice day!'",
-        expectedResponses: ["bedankt, fijne dag", "dank u wel fijne dag", "bedankt fijne dag nog"],
+        expectedResponses: ["bedankt, fijne dag", "dank u wel fijne dag"],
         feedbackOnWrong: "Try: 'Bedankt, fijne dag!'",
         grammarTip: "'Veel plezier' = have fun. 'Fijne dag' = nice day.",
       },
@@ -333,12 +366,15 @@ export const scenarios: Scenario[] = [
     description: "Order coffee and chat at a Dutch café",
     difficulty: "beginner",
     color: "orange",
+    scenarioImage: cafeImg,
     conversations: [
       {
         speaker: "dutch",
         dutchText: "Hallo! Wat wilt u drinken?",
-        englishHint: "Order a coffee: 'A coffee with milk please'",
-        expectedResponses: ["een koffie met melk alstublieft", "koffie met melk alstublieft", "een koffie met melk graag"],
+        englishHint: "Look at the image — you see a coffee cup and apple pie with whipped cream on a terrace. Order a coffee with milk.",
+        imageUrl: cafeImg,
+        imageDescription: "A Dutch café terrace with a cup of coffee, a slice of apple pie topped with whipped cream, and extra whipped cream on the side.",
+        expectedResponses: ["een koffie met melk alstublieft", "koffie met melk alstublieft"],
         feedbackOnWrong: "Try: 'Een koffie met melk alstublieft'",
         grammarTip: "'Koffie' = coffee. 'Met melk' = with milk. 'Zonder' = without.",
       },
@@ -346,7 +382,7 @@ export const scenarios: Scenario[] = [
         speaker: "dutch",
         dutchText: "Wilt u er een gebakje bij?",
         englishHint: "Say 'Yes, an apple pie please'",
-        expectedResponses: ["ja, een appeltaart alstublieft", "ja een appeltaart alstublieft", "een appeltaart graag"],
+        expectedResponses: ["ja, een appeltaart alstublieft", "een appeltaart graag"],
         feedbackOnWrong: "Try: 'Ja, een appeltaart alstublieft'",
         grammarTip: "'Gebakje' = pastry. 'Appeltaart' = apple pie — a Dutch classic!",
       },
@@ -354,15 +390,15 @@ export const scenarios: Scenario[] = [
         speaker: "dutch",
         dutchText: "Goede keuze! Wilt u met slagroom?",
         englishHint: "Say 'Yes please, with whipped cream'",
-        expectedResponses: ["ja graag, met slagroom", "ja met slagroom", "ja alstublieft"],
+        expectedResponses: ["ja graag, met slagroom", "ja met slagroom"],
         feedbackOnWrong: "Try: 'Ja graag, met slagroom'",
         grammarTip: "'Slagroom' = whipped cream. Always say yes to slagroom in Holland! 😄",
       },
       {
         speaker: "dutch",
         dutchText: "Alstublieft! Dat is zes euro vijftig.",
-        englishHint: "Say 'Here you go' (hand money/card)",
-        expectedResponses: ["alstublieft", "hier alstublieft", "alsjeblieft"],
+        englishHint: "Say 'Here you go'",
+        expectedResponses: ["alstublieft", "hier alstublieft"],
         feedbackOnWrong: "Try: 'Alstublieft'",
         grammarTip: "'Alstublieft' means both 'please' AND 'here you go'. Context matters!",
       },
@@ -370,7 +406,7 @@ export const scenarios: Scenario[] = [
         speaker: "dutch",
         dutchText: "Dank u wel! Geniet ervan!",
         englishHint: "Say 'Thank you!'",
-        expectedResponses: ["dank u wel", "bedankt", "dank u"],
+        expectedResponses: ["dank u wel", "bedankt"],
         feedbackOnWrong: "Try: 'Dank u wel!'",
         grammarTip: "'Geniet ervan' = enjoy it. 'Ervan' = of it (er + van).",
       },
@@ -384,11 +420,14 @@ export const scenarios: Scenario[] = [
     description: "Send a package or buy stamps",
     difficulty: "easy",
     color: "blue",
+    scenarioImage: postOfficeImg,
     conversations: [
       {
         speaker: "dutch",
         dutchText: "Goedemiddag! Wat kan ik voor u doen?",
-        englishHint: "Say 'I want to send a package to England'",
+        englishHint: "Look at the image — you see a PostNL counter with packages. Say you want to send a package to England.",
+        imageUrl: postOfficeImg,
+        imageDescription: "A PostNL post office counter with stacked orange and brown packages, a postal worker behind the desk.",
         expectedResponses: ["ik wil een pakket naar engeland sturen", "ik wil graag een pakket naar engeland sturen"],
         feedbackOnWrong: "Try: 'Ik wil een pakket naar Engeland sturen'",
         grammarTip: "'Pakket' = package. 'Sturen' = to send. The verb goes to the end with 'wil'.",
@@ -397,9 +436,9 @@ export const scenarios: Scenario[] = [
         speaker: "dutch",
         dutchText: "Naar Engeland, oké. Hoe zwaar is het pakket?",
         englishHint: "Say 'About two kilos'",
-        expectedResponses: ["ongeveer twee kilo", "twee kilo", "ongeveer twee kilo denk ik"],
+        expectedResponses: ["ongeveer twee kilo", "twee kilo"],
         feedbackOnWrong: "Try: 'Ongeveer twee kilo'",
-        grammarTip: "'Ongeveer' = approximately. 'Zwaar' = heavy. 'Hoe zwaar' = how heavy.",
+        grammarTip: "'Ongeveer' = approximately. 'Zwaar' = heavy.",
       },
       {
         speaker: "dutch",
@@ -421,7 +460,7 @@ export const scenarios: Scenario[] = [
         speaker: "dutch",
         dutchText: "Vijf postzegels erbij. Dat is in totaal vijftien euro. Fijne dag!",
         englishHint: "Say 'Thank you, goodbye!'",
-        expectedResponses: ["bedankt, tot ziens", "dank u wel tot ziens", "dank u wel, tot ziens"],
+        expectedResponses: ["bedankt, tot ziens", "dank u wel, tot ziens"],
         feedbackOnWrong: "Try: 'Bedankt, tot ziens!'",
         grammarTip: "'In totaal' = in total. 'Erbij' = added to it.",
       },
@@ -435,20 +474,23 @@ export const scenarios: Scenario[] = [
     description: "Shop for cheese and fresh produce",
     difficulty: "beginner",
     color: "teal",
+    scenarioImage: marketImg,
     conversations: [
       {
         speaker: "dutch",
         dutchText: "Hallo! Wilt u kaas proeven?",
-        englishHint: "Say 'Yes please, I would like to try the old cheese'",
+        englishHint: "Look at the image — you see stacks of Gouda cheese wheels and fresh vegetables at a market stall. Say yes and that you'd like to try the old cheese.",
+        imageUrl: marketImg,
+        imageDescription: "A Dutch outdoor market stall with stacks of Gouda cheese wheels, fresh tomatoes, kale, and other vegetables.",
         expectedResponses: ["ja graag, ik wil de oude kaas proeven", "ja graag", "ja alstublieft"],
         feedbackOnWrong: "Try: 'Ja graag, ik wil de oude kaas proeven'",
-        grammarTip: "'Proeven' = to taste/try. 'Oude kaas' = old/aged cheese. 'Jonge kaas' = young cheese.",
+        grammarTip: "'Proeven' = to taste/try. 'Oude kaas' = old/aged cheese.",
       },
       {
         speaker: "dutch",
         dutchText: "Alstublieft! Lekker, hè? Hoeveel wilt u?",
         englishHint: "Say 'A piece of 500 grams please'",
-        expectedResponses: ["een stuk van vijfhonderd gram alstublieft", "vijfhonderd gram alstublieft", "een half pond alstublieft"],
+        expectedResponses: ["vijfhonderd gram alstublieft", "een half pond alstublieft"],
         feedbackOnWrong: "Try: 'Vijfhonderd gram alstublieft'",
         grammarTip: "'Lekker' = delicious/tasty. 'Hè?' is a Dutch tag question meaning 'right?'",
       },
@@ -456,7 +498,7 @@ export const scenarios: Scenario[] = [
         speaker: "dutch",
         dutchText: "Prima! Heeft u ook groente nodig? De tomaten zijn heel vers vandaag.",
         englishHint: "Say 'Yes, a kilo of tomatoes please'",
-        expectedResponses: ["ja, een kilo tomaten alstublieft", "een kilo tomaten alstublieft", "ja een kilo tomaten"],
+        expectedResponses: ["ja, een kilo tomaten alstublieft", "een kilo tomaten alstublieft"],
         feedbackOnWrong: "Try: 'Ja, een kilo tomaten alstublieft'",
         grammarTip: "'Vers' = fresh. 'Vandaag' = today. 'Groente' = vegetables.",
       },
@@ -464,7 +506,7 @@ export const scenarios: Scenario[] = [
         speaker: "dutch",
         dutchText: "Nog iets anders?",
         englishHint: "Say 'No, that's all'",
-        expectedResponses: ["nee, dat is alles", "nee dat is alles", "dat is alles"],
+        expectedResponses: ["nee, dat is alles", "dat is alles"],
         feedbackOnWrong: "Try: 'Nee, dat is alles'",
         grammarTip: "'Nog iets anders?' = anything else? 'Dat is alles' = that's all.",
       },
@@ -472,9 +514,9 @@ export const scenarios: Scenario[] = [
         speaker: "dutch",
         dutchText: "Dat is dan zeven euro. Alstublieft en tot de volgende keer!",
         englishHint: "Say 'Thank you, see you next time!'",
-        expectedResponses: ["bedankt, tot de volgende keer", "dank u wel tot de volgende keer", "bedankt tot de volgende keer"],
+        expectedResponses: ["bedankt, tot de volgende keer", "dank u wel tot de volgende keer"],
         feedbackOnWrong: "Try: 'Bedankt, tot de volgende keer!'",
-        grammarTip: "'Tot de volgende keer' = until next time. A warm Dutch farewell!",
+        grammarTip: "'Tot de volgende keer' = until next time.",
       },
     ],
   },
@@ -486,12 +528,15 @@ export const scenarios: Scenario[] = [
     description: "Check in and ask about your room",
     difficulty: "medium",
     color: "orange",
+    scenarioImage: hotelImg,
     conversations: [
       {
         speaker: "dutch",
         dutchText: "Goedenavond! Welkom in Hotel Oranje. Heeft u een reservering?",
-        englishHint: "Say 'Good evening, yes I have a reservation'",
-        expectedResponses: ["goedenavond, ja ik heb een reservering", "ja, ik heb een reservering", "ja ik heb een reservering"],
+        englishHint: "Look at the image — you see a hotel reception with a 'Welcome' sign and luggage. Say you have a reservation.",
+        imageUrl: hotelImg,
+        imageDescription: "A hotel reception lobby with a wooden front desk, 'Welcome Reception' sign, suitcases, and elegant interior lighting.",
+        expectedResponses: ["goedenavond, ja ik heb een reservering", "ja, ik heb een reservering"],
         feedbackOnWrong: "Try: 'Goedenavond, ja ik heb een reservering'",
         grammarTip: "'Reservering' = reservation. 'Welkom' = welcome.",
       },
@@ -499,7 +544,7 @@ export const scenarios: Scenario[] = [
         speaker: "dutch",
         dutchText: "Op welke naam staat de reservering?",
         englishHint: "Say 'Under the name Smith'",
-        expectedResponses: ["op naam van smith", "de naam is smith", "smith"],
+        expectedResponses: ["op naam van smith", "de naam is smith"],
         feedbackOnWrong: "Try: 'Op naam van Smith'",
         grammarTip: "'Op welke naam' = under which name. 'Op naam van' = under the name of.",
       },
@@ -515,9 +560,9 @@ export const scenarios: Scenario[] = [
         speaker: "dutch",
         dutchText: "Het ontbijt is van zeven tot tien uur in het restaurant beneden.",
         englishHint: "Ask 'Is there wifi?'",
-        expectedResponses: ["is er wifi", "heeft u wifi", "is er wifi beschikbaar"],
+        expectedResponses: ["is er wifi", "heeft u wifi"],
         feedbackOnWrong: "Try: 'Is er wifi?'",
-        grammarTip: "'Beneden' = downstairs. 'Is er...' = is there... 'Beschikbaar' = available.",
+        grammarTip: "'Beneden' = downstairs. 'Is er...' = is there...",
       },
       {
         speaker: "dutch",

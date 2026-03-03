@@ -30,12 +30,21 @@ const ScenarioCard = ({ scenario, index }: ScenarioCardProps) => {
       whileHover={{ y: -6, scale: 1.02 }}
       whileTap={{ scale: 0.97 }}
       onClick={() => navigate(`/scenario/${scenario.id}`)}
-      className="group relative flex flex-col items-start rounded-2xl bg-card p-6 text-left shadow-card transition-shadow hover:shadow-card-hover"
+      className="group relative flex flex-col items-start overflow-hidden rounded-2xl bg-card text-left shadow-card transition-shadow hover:shadow-card-hover"
     >
-      {/* Emoji badge */}
-      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-muted text-3xl">
-        {scenario.emoji}
+      {/* Scenario image */}
+      <div className="relative w-full h-32 overflow-hidden">
+        <img
+          src={scenario.scenarioImage}
+          alt={scenario.title}
+          className="w-full h-full object-cover transition-transform group-hover:scale-105"
+        />
+        <div className="absolute top-2 left-2 flex h-10 w-10 items-center justify-center rounded-xl bg-card/90 text-xl backdrop-blur-sm">
+          {scenario.emoji}
+        </div>
       </div>
+
+      <div className="p-5">
 
       {/* Difficulty badge */}
       <span
@@ -57,6 +66,7 @@ const ScenarioCard = ({ scenario, index }: ScenarioCardProps) => {
       {/* Arrow indicator */}
       <div className="mt-4 flex items-center gap-1 text-sm font-semibold text-primary opacity-0 transition-opacity group-hover:opacity-100">
         Start practice →
+      </div>
       </div>
     </motion.button>
   );

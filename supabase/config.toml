@@ -1,0 +1,4 @@
+project_id = "esodrceqheivcpafastv"
+
+[functions.evaluate-dutch]
+verify_jwt = false
