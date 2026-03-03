@@ -1,9 +1,10 @@
 import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, RotateCcw, ArrowRight, Volume2, Keyboard } from "lucide-react";
+import { Mic, MicOff, RotateCcw, ArrowRight, Volume2, Keyboard, Loader2, BookOpen, MessageSquare, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { type ConversationTurn } from "@/data/scenarios";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ConversationViewProps {
   turns: ConversationTurn[];
@@ -12,12 +13,26 @@ interface ConversationViewProps {
   onComplete: () => void;
 }
 
-interface FeedbackState {
-  correct: boolean;
-  userAnswer: string;
-  feedbackText: string;
-  grammarTip?: string;
+interface AIFeedback {
+  grade: "perfect" | "good" | "needs_improvement" | "incorrect";
+  feedback: string;
+  correctedDutch: string;
+  grammarNotes: string[];
+  pronunciationTips?: string[];
+  vocabularyNotes?: string[];
 }
+
+interface FeedbackState {
+  userAnswer: string;
+  aiFeedback: AIFeedback;
+}
+
+const gradeConfig = {
+  perfect: { emoji: "🎉", label: "Perfect!", color: "text-success", bg: "bg-success/10 border-success/20" },
+  good: { emoji: "👍", label: "Good job!", color: "text-primary", bg: "bg-primary/10 border-primary/20" },
+  needs_improvement: { emoji: "💪", label: "Almost there!", color: "text-warning", bg: "bg-amber-500/10 border-amber-500/20" },
+  incorrect: { emoji: "🔄", label: "Let's try again", color: "text-destructive", bg: "bg-destructive/10 border-destructive/20" },
+};
 
 const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, onComplete }: ConversationViewProps) => {
   const [currentTurn, setCurrentTurn] = useState(0);
@@ -26,32 +41,56 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, onComplete }: C
   const [showTextInput, setShowTextInput] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [score, setScore] = useState(0);
+  const [isEvaluating, setIsEvaluating] = useState(false);
   const recognitionRef = useRef<any>(null);
 
   const turn = turns[currentTurn];
   const progress = ((currentTurn) / turns.length) * 100;
 
-  const checkAnswer = useCallback((answer: string) => {
-    const normalized = answer.toLowerCase().replace(/[?.!,]/g, "").trim();
-    const isCorrect = turn.expectedResponses.some((expected) => {
-      const normalizedExpected = expected.toLowerCase().replace(/[?.!,]/g, "").trim();
-      // Check for exact match or if the answer contains the expected response
-      return normalized === normalizedExpected || 
-             normalized.includes(normalizedExpected) ||
-             normalizedExpected.includes(normalized);
-    });
+  const evaluateWithAI = useCallback(async (answer: string) => {
+    setIsEvaluating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("evaluate-dutch", {
+        body: {
+          userAnswer: answer,
+          dutchPrompt: turn.dutchText,
+          englishHint: turn.englishHint,
+          scenarioContext: `${scenarioTitle} - Turn ${currentTurn + 1} of ${turns.length}`,
+          imageDescription: turn.imageDescription || null,
+        },
+      });
 
-    if (isCorrect) {
-      setScore((s) => s + 1);
+      if (error) throw error;
+
+      const aiFeedback = data as AIFeedback;
+      
+      if (aiFeedback.grade === "perfect" || aiFeedback.grade === "good") {
+        setScore((s) => s + 1);
+      }
+
+      setFeedback({ userAnswer: answer, aiFeedback });
+    } catch (e) {
+      console.error("AI evaluation failed, using fallback:", e);
+      // Fallback to basic check
+      const normalized = answer.toLowerCase().replace(/[?.!,]/g, "").trim();
+      const isCorrect = turn.expectedResponses.some((expected) => {
+        const ne = expected.toLowerCase().replace(/[?.!,]/g, "").trim();
+        return normalized === ne || normalized.includes(ne) || ne.includes(normalized);
+      });
+      if (isCorrect) setScore((s) => s + 1);
+      setFeedback({
+        userAnswer: answer,
+        aiFeedback: {
+          grade: isCorrect ? "good" : "incorrect",
+          feedback: isCorrect ? "Heel goed! Great job!" : turn.feedbackOnWrong,
+          correctedDutch: turn.expectedResponses[0],
+          grammarNotes: turn.grammarTip ? [turn.grammarTip] : [],
+        },
+      });
+    } finally {
+      setIsEvaluating(false);
     }
-
-    setFeedback({
-      correct: isCorrect,
-      userAnswer: answer,
-      feedbackText: isCorrect ? "Heel goed! 🎉 Great job!" : turn.feedbackOnWrong,
-      grammarTip: isCorrect ? undefined : turn.grammarTip,
-    });
-  }, [turn]);
+  }, [turn, scenarioTitle, currentTurn, turns.length]);
 
   const startListening = useCallback(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -68,7 +107,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, onComplete }: C
     recognition.onresult = (event: any) => {
       const result = event.results[0][0].transcript;
       setIsListening(false);
-      checkAnswer(result);
+      evaluateWithAI(result);
     };
 
     recognition.onerror = () => {
@@ -83,7 +122,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, onComplete }: C
     recognitionRef.current = recognition;
     recognition.start();
     setIsListening(true);
-  }, [checkAnswer]);
+  }, [evaluateWithAI]);
 
   const stopListening = useCallback(() => {
     recognitionRef.current?.stop();
@@ -92,7 +131,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, onComplete }: C
 
   const handleTextSubmit = () => {
     if (textInput.trim()) {
-      checkAnswer(textInput.trim());
+      evaluateWithAI(textInput.trim());
       setTextInput("");
     }
   };
@@ -110,8 +149,8 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, onComplete }: C
     setFeedback(null);
   };
 
-  const speakDutch = useCallback(() => {
-    const utterance = new SpeechSynthesisUtterance(turn.dutchText);
+  const speakDutch = useCallback((text?: string) => {
+    const utterance = new SpeechSynthesisUtterance(text || turn.dutchText);
     utterance.lang = "nl-NL";
     utterance.rate = 0.85;
     speechSynthesis.speak(utterance);
@@ -139,6 +178,27 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, onComplete }: C
         </div>
       </div>
 
+      {/* Image for this turn */}
+      {turn.imageUrl && (
+        <motion.div
+          key={`img-${currentTurn}`}
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="mb-6 overflow-hidden rounded-2xl border border-border shadow-card"
+        >
+          <img
+            src={turn.imageUrl}
+            alt={turn.imageDescription || "Scene image"}
+            className="w-full h-48 object-cover"
+          />
+          {turn.imageDescription && (
+            <div className="bg-card px-4 py-2 text-xs text-muted-foreground italic">
+              📷 Describe what you see and use it in your answer
+            </div>
+          )}
+        </motion.div>
+      )}
+
       {/* Speaker bubble */}
       <motion.div
         key={currentTurn}
@@ -157,7 +217,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, onComplete }: C
                 {turn.dutchText}
               </p>
               <button
-                onClick={speakDutch}
+                onClick={() => speakDutch()}
                 className="mt-2 flex items-center gap-1 text-sm font-medium text-secondary hover:text-secondary/80 transition-colors"
               >
                 <Volume2 className="h-4 w-4" />
@@ -173,7 +233,20 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, onComplete }: C
 
       {/* Response area */}
       <AnimatePresence mode="wait">
-        {!feedback ? (
+        {isEvaluating ? (
+          <motion.div
+            key="evaluating"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="mt-auto flex flex-col items-center gap-3 py-8"
+          >
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <p className="text-sm font-medium text-muted-foreground">
+              Evaluating your Dutch... 🇳🇱
+            </p>
+          </motion.div>
+        ) : !feedback ? (
           <motion.div
             key="input"
             initial={{ opacity: 0, y: 20 }}
@@ -238,40 +311,95 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, onComplete }: C
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="mt-auto"
+            className="mt-auto space-y-4"
           >
             {/* User's answer */}
-            <div className="mb-4 flex justify-end">
+            <div className="flex justify-end">
               <div className={`rounded-2xl rounded-br-md px-5 py-3 ${
-                feedback.correct ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
-              }`}>
-                <p className="text-sm font-medium">You said:</p>
-                <p className="font-display text-lg font-bold">{feedback.userAnswer}</p>
+                gradeConfig[feedback.aiFeedback.grade].bg
+              } border`}>
+                <p className="text-sm font-medium text-muted-foreground">You said:</p>
+                <p className="font-display text-lg font-bold text-foreground">{feedback.userAnswer}</p>
               </div>
             </div>
 
-            {/* Feedback card */}
-            <div className={`rounded-2xl p-5 ${
-              feedback.correct
-                ? "bg-success/10 border border-success/20"
-                : "bg-destructive/10 border border-destructive/20"
-            }`}>
-              <p className={`font-display text-lg font-bold ${
-                feedback.correct ? "text-success" : "text-destructive"
-              }`}>
-                {feedback.feedbackText}
-              </p>
-              {feedback.grammarTip && (
+            {/* AI Feedback card */}
+            <div className={`rounded-2xl p-5 border ${gradeConfig[feedback.aiFeedback.grade].bg}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                <p className={`font-display text-lg font-bold ${gradeConfig[feedback.aiFeedback.grade].color}`}>
+                  {gradeConfig[feedback.aiFeedback.grade].emoji} {gradeConfig[feedback.aiFeedback.grade].label}
+                </p>
+              </div>
+              <p className="text-foreground">{feedback.aiFeedback.feedback}</p>
+
+              {/* Corrected Dutch */}
+              <div className="mt-3 rounded-xl bg-card p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-secondary">
+                    <MessageSquare className="inline h-4 w-4 mr-1" />
+                    Ideal response
+                  </p>
+                  <button
+                    onClick={() => speakDutch(feedback.aiFeedback.correctedDutch)}
+                    className="flex items-center gap-1 text-xs font-medium text-secondary hover:text-secondary/80 transition-colors"
+                  >
+                    <Volume2 className="h-3 w-3" />
+                    Listen
+                  </button>
+                </div>
+                <p className="mt-1 font-display font-bold text-foreground">
+                  {feedback.aiFeedback.correctedDutch}
+                </p>
+              </div>
+
+              {/* Grammar Notes */}
+              {feedback.aiFeedback.grammarNotes.length > 0 && (
                 <div className="mt-3 rounded-xl bg-card p-4">
-                  <p className="text-sm font-semibold text-secondary">📚 Grammar Tip</p>
-                  <p className="mt-1 text-sm text-foreground">{feedback.grammarTip}</p>
+                  <p className="text-sm font-semibold text-secondary">
+                    <BookOpen className="inline h-4 w-4 mr-1" />
+                    Grammar Notes
+                  </p>
+                  <ul className="mt-1 space-y-1">
+                    {feedback.aiFeedback.grammarNotes.map((note, i) => (
+                      <li key={i} className="text-sm text-foreground">• {note}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Pronunciation Tips */}
+              {feedback.aiFeedback.pronunciationTips && feedback.aiFeedback.pronunciationTips.length > 0 && (
+                <div className="mt-3 rounded-xl bg-card p-4">
+                  <p className="text-sm font-semibold text-primary">
+                    🗣️ Pronunciation Tips
+                  </p>
+                  <ul className="mt-1 space-y-1">
+                    {feedback.aiFeedback.pronunciationTips.map((tip, i) => (
+                      <li key={i} className="text-sm text-foreground">• {tip}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Vocabulary Notes */}
+              {feedback.aiFeedback.vocabularyNotes && feedback.aiFeedback.vocabularyNotes.length > 0 && (
+                <div className="mt-3 rounded-xl bg-card p-4">
+                  <p className="text-sm font-semibold text-accent-foreground">
+                    📖 Vocabulary
+                  </p>
+                  <ul className="mt-1 space-y-1">
+                    {feedback.aiFeedback.vocabularyNotes.map((note, i) => (
+                      <li key={i} className="text-sm text-foreground">• {note}</li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </div>
 
             {/* Action buttons */}
-            <div className="mt-6 flex justify-center gap-3">
-              {!feedback.correct && (
+            <div className="flex justify-center gap-3 pt-2">
+              {(feedback.aiFeedback.grade === "incorrect" || feedback.aiFeedback.grade === "needs_improvement") && (
                 <Button
                   onClick={handleRetry}
                   variant="outline"
