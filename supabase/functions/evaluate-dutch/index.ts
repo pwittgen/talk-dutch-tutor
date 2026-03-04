@@ -29,7 +29,9 @@ INBURGERING A2 SPREKEN EXAM MODE:
 - Encourage the student to answer the question directly rather than giving long descriptions.
 - Grade "perfect" for grammatically correct short answers that address the question.
 - Grade "good" for understandable answers with minor errors.
-- A 1-sentence answer that's correct = 5 stars.` : '';
+- A 1-sentence answer that's correct = 5 stars.
+- Do NOT penalize for punctuation issues (missing periods, commas, capitals). Focus only on content and grammar.
+- Speech recognition often drops punctuation — ignore this completely.` : '';
 
     const openEndedRules = openEnded ? `
 OPEN-ENDED SCENARIO RULES:

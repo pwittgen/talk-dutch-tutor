@@ -30,7 +30,7 @@ const ExamPage = () => {
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
-            <h1 className="font-display text-lg font-bold text-foreground">Exam Results</h1>
+            <h1 className="font-display text-lg font-bold text-foreground">Resultaten</h1>
           </div>
         </div>
 
@@ -41,15 +41,13 @@ const ExamPage = () => {
             className="text-center mb-8"
           >
             <Trophy className="h-16 w-16 text-primary mx-auto mb-4" />
-            <h2 className="font-display text-3xl font-black text-foreground">Exam Complete!</h2>
+            <h2 className="font-display text-3xl font-black text-foreground">Oefenexamen klaar!</h2>
             <div className="flex items-center justify-center gap-1 mt-3">
               {Array.from({ length: 5 }).map((_, i) => (
                 <Star
                   key={i}
                   className={`h-6 w-6 ${
-                    i < Math.round(averageStars)
-                      ? "fill-primary text-primary"
-                      : "text-muted"
+                    i < Math.round(averageStars) ? "fill-primary text-primary" : "text-muted"
                   }`}
                 />
               ))}
@@ -58,7 +56,7 @@ const ExamPage = () => {
               </span>
             </div>
             <p className="mt-2 text-muted-foreground">
-              You answered {results.length} of {examQuestions.length} questions
+              U hebt {results.filter(r => r.userAnswer !== "(not answered)").length} van {examQuestions.length} vragen beantwoord
             </p>
           </motion.div>
 
@@ -68,22 +66,22 @@ const ExamPage = () => {
               return (
                 <div key={i} className="rounded-xl bg-card border border-border p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-bold text-muted-foreground">Q{i + 1}</span>
+                    <span className="text-sm font-bold text-muted-foreground">
+                      Opgave {q?.opgave} — Vraag {i + 1}
+                    </span>
                     <div className="flex gap-0.5">
                       {Array.from({ length: 5 }).map((_, j) => (
                         <Star
                           key={j}
                           className={`h-3.5 w-3.5 ${
-                            j < (result.starRating || 0)
-                              ? "fill-primary text-primary"
-                              : "text-muted"
+                            j < (result.starRating || 0) ? "fill-primary text-primary" : "text-muted"
                           }`}
                         />
                       ))}
                     </div>
                   </div>
                   <p className="text-sm text-foreground font-medium">{q?.dutchQuestion}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Your answer: {result.userAnswer}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Uw antwoord: {result.userAnswer}</p>
                 </div>
               );
             })}
@@ -94,10 +92,10 @@ const ExamPage = () => {
               onClick={() => { setResults(null); setStarted(true); }}
               className="rounded-xl bg-gradient-delft text-secondary-foreground gap-2"
             >
-              <RotateCcw className="h-4 w-4" /> Try Again
+              <RotateCcw className="h-4 w-4" /> Opnieuw proberen
             </Button>
             <Button onClick={() => navigate("/")} variant="outline" className="rounded-xl">
-              Back to Home
+              Terug naar home
             </Button>
           </div>
         </div>
@@ -116,7 +114,7 @@ const ExamPage = () => {
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
-            <h1 className="font-display text-lg font-bold text-foreground">🎓 Speaking Exam Practice</h1>
+            <h1 className="font-display text-lg font-bold text-foreground">🎓 A2 Spreken Oefenexamen</h1>
           </div>
         </div>
 
@@ -128,36 +126,40 @@ const ExamPage = () => {
           >
             <div className="text-6xl mb-2">🎓</div>
             <h2 className="font-display text-3xl font-black text-foreground">
-              Inburgering Speaking Exam
+              A2 Spreken Oefenexamen
             </h2>
             <p className="text-muted-foreground max-w-md mx-auto">
-              Practice the real DUO A2 Spreken exam format: 12 photo-based questions. 
-              Read the situation, look at the photo, and answer in Dutch. 
-              Keep your answers short and simple — just like the real test.
+              Oefen het echte DUO A2 Spreken examen. 12 vragen verdeeld over 4 opgaven. 
+              Geef korte, simpele antwoorden — net als bij het echte examen.
             </p>
 
-            <div className="grid grid-cols-3 gap-4 max-w-sm mx-auto text-center">
+            <div className="space-y-3 max-w-md mx-auto text-left">
               <div className="rounded-xl bg-card border border-border p-4">
-                <p className="font-display text-2xl font-black text-primary">12</p>
-                <p className="text-xs text-muted-foreground font-medium">Questions</p>
+                <p className="font-display text-sm font-black text-primary">Opgave 1 — Filmpje</p>
+                <p className="text-xs text-muted-foreground">4 vragen over een filmpje</p>
               </div>
               <div className="rounded-xl bg-card border border-border p-4">
-                <p className="font-display text-2xl font-black text-secondary">📸</p>
-                <p className="text-xs text-muted-foreground font-medium">Photo-based</p>
+                <p className="font-display text-sm font-black text-primary">Opgave 2 — 1 plaatje</p>
+                <p className="text-xs text-muted-foreground">4 vragen bij één foto</p>
               </div>
               <div className="rounded-xl bg-card border border-border p-4">
-                <p className="font-display text-2xl font-black text-accent">🗣️</p>
-                <p className="text-xs text-muted-foreground font-medium">Speaking</p>
+                <p className="font-display text-sm font-black text-primary">Opgave 3 — 2 plaatjes</p>
+                <p className="text-xs text-muted-foreground">4 vragen bij twee foto's</p>
+              </div>
+              <div className="rounded-xl bg-card border border-border p-4">
+                <p className="font-display text-sm font-black text-primary">Opgave 4 — 3 plaatjes</p>
+                <p className="text-xs text-muted-foreground">4 vragen bij drie foto's — vertel ook waarom</p>
               </div>
             </div>
 
             <div className="rounded-xl bg-muted/50 p-4 max-w-md mx-auto text-left">
-              <p className="text-sm font-bold text-foreground mb-2">Exam tips:</p>
+              <p className="text-sm font-bold text-foreground mb-2">Tips voor het examen:</p>
               <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• Keep answers short: 1-2 sentences is perfect</li>
-                <li>• Answer the question directly</li>
-                <li>• Use simple words you know well</li>
-                <li>• You control the recording — start and stop manually</li>
+                <li>• Geef korte antwoorden: 1-2 zinnen is genoeg</li>
+                <li>• Beantwoord de vraag direct</li>
+                <li>• Gebruik simpele woorden</li>
+                <li>• U start en stopt de opname zelf</li>
+                <li>• U kunt heen en weer navigeren tussen vragen</li>
               </ul>
             </div>
 
@@ -165,7 +167,7 @@ const ExamPage = () => {
               onClick={() => setStarted(true)}
               className="rounded-2xl h-14 px-10 text-lg font-bold bg-gradient-delft text-secondary-foreground shadow-card"
             >
-              Start Exam Practice
+              Start oefenexamen
             </Button>
           </motion.div>
         </div>
@@ -184,12 +186,12 @@ const ExamPage = () => {
             <ArrowLeft className="h-5 w-5" />
           </button>
           <h1 className="font-display text-lg font-bold text-foreground">
-            🎓 Speaking Exam
+            🎓 A2 Spreken Oefenexamen
           </h1>
         </div>
       </div>
 
-      <div className="mx-auto max-w-2xl px-4 py-8">
+      <div className="mx-auto max-w-2xl px-4 py-6">
         <ExamSimulation questions={examQuestions} onComplete={handleComplete} />
       </div>
     </div>
