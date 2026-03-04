@@ -145,14 +145,15 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     }
   }, [turn, speechRate, muted, fetchTtsBlob, preloadNextTurn]);
 
-  // Auto-play dialogue when turn changes
+  // Auto-play dialogue only on initial mount (first turn)
+  const hasPlayedInitialRef = useRef(false);
   useEffect(() => {
-    if (!muted && turn) {
-      // Small delay so the UI renders first
+    if (!muted && turn && !hasPlayedInitialRef.current) {
+      hasPlayedInitialRef.current = true;
       const timeout = setTimeout(() => speakDutch(), 600);
       return () => clearTimeout(timeout);
     }
-  }, [currentTurn, muted]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [muted]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const evaluateWithAI = useCallback(async (answer: string) => {
     setIsEvaluating(true);
@@ -291,6 +292,11 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
         await generateNextTurn(conversationHistory, nextTurnIdx + 1);
       }
       setCurrentTurn(nextTurnIdx);
+      // Play TTS directly from gesture context (critical for mobile Safari)
+      const nextTurn = (openEnded ? dynamicTurns : turns)[nextTurnIdx];
+      if (nextTurn && !muted) {
+        speakDutch(nextTurn.dutchText);
+      }
     }
   };
 
