@@ -22,6 +22,7 @@ const isMobileDevice = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgen
 /**
  * Robust speech recognition hook with:
  * - getUserMedia pre-warming (fixes mobile Safari/Chrome)
+ * - Persistent mic stream across turns (no re-prompt per turn)
  * - Delayed auto-stop (waits for first speech before starting timer)
  * - No-speech timeout fallback
  * - Safari auto-restart handling
@@ -47,8 +48,11 @@ export function useSpeechRecognition({
   const noSpeechTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restartCountRef = useRef(0);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const micStreamRef = useRef<MediaStream | null>(null);
   const hasReceivedSpeechRef = useRef(false);
+
+  // Persistent mic stream — acquired once, kept alive across turns
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const micAcquiredRef = useRef(false);
 
   const isSafari = isSafariBrowser();
   const isMobile = isMobileDevice();
@@ -59,14 +63,18 @@ export function useSpeechRecognition({
   useEffect(() => { onTranscriptRef.current = onTranscript; }, [onTranscript]);
   useEffect(() => { onFallbackRef.current = onFallbackToText; }, [onFallbackToText]);
 
+  /** Release mic hardware — only called on unmount */
   const releaseMic = useCallback(() => {
     if (micStreamRef.current) {
       micStreamRef.current.getTracks().forEach(t => t.stop());
       micStreamRef.current = null;
+      micAcquiredRef.current = false;
+      logSpeechEvent(scenario, "mic-released", {});
     }
-  }, []);
+  }, [scenario]);
 
-  const cleanup = useCallback(() => {
+  /** Clean up recognition session (timers, recognition instance) but NOT the mic stream */
+  const cleanupSession = useCallback(() => {
     if (autoStopTimerRef.current) {
       clearTimeout(autoStopTimerRef.current);
       autoStopTimerRef.current = null;
@@ -81,25 +89,51 @@ export function useSpeechRecognition({
     }
     try { recognitionRef.current?.abort(); } catch {}
     recognitionRef.current = null;
-    releaseMic();
     setIsListening(false);
     setIsPreparing(false);
     setInterimText("");
-  }, [releaseMic]);
+  }, []);
 
   const submitFinal = useCallback(() => {
     if (hasSubmittedRef.current) return;
     const transcript = accumulatedTranscriptRef.current.trim();
     if (!transcript) {
       logSpeechEvent(scenario, "submit-empty", { message: "No transcript accumulated" });
-      cleanup();
+      cleanupSession();
       return;
     }
     hasSubmittedRef.current = true;
     logSpeechEvent(scenario, "submit-final", { transcript, restarts: restartCountRef.current });
-    cleanup();
+    cleanupSession();
     onTranscriptRef.current(transcript);
-  }, [scenario, cleanup]);
+  }, [scenario, cleanupSession]);
+
+  /** Acquire mic stream if not already held */
+  const ensureMicStream = useCallback(async (): Promise<boolean> => {
+    // Check if existing stream is still active
+    if (micStreamRef.current) {
+      const tracks = micStreamRef.current.getTracks();
+      const allLive = tracks.length > 0 && tracks.every(t => t.readyState === "live");
+      if (allLive) {
+        return true; // Stream still good
+      }
+      // Stream died, clean up reference
+      micStreamRef.current = null;
+      micAcquiredRef.current = false;
+    }
+
+    try {
+      logSpeechEvent(scenario, "mic-warmup-start", {});
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micStreamRef.current = stream;
+      micAcquiredRef.current = true;
+      logSpeechEvent(scenario, "mic-warmup-success", {});
+      return true;
+    } catch (err: any) {
+      logSpeechEvent(scenario, "mic-warmup-failed", { error: err?.message || String(err) });
+      return false;
+    }
+  }, [scenario]);
 
   const startListening = useCallback(() => {
     // Pre-flight checks
@@ -198,7 +232,7 @@ export function useSpeechRecognition({
 
         if (error === "not-allowed" || error === "service-not-allowed") {
           logSpeechEvent(scenario, "permission-denied", { error });
-          cleanup();
+          cleanupSession();
           onFallbackRef.current();
           return;
         }
@@ -250,45 +284,39 @@ export function useSpeechRecognition({
           restart: restartCountRef.current,
         });
         if (restartCountRef.current === 0) {
-          cleanup();
+          cleanupSession();
           onFallbackRef.current();
         }
       }
     };
 
-    // ===== STEP 1: Pre-warm microphone with getUserMedia =====
-    // This must happen in the same user-gesture call stack
-    const warmupMic = async () => {
-      try {
-        logSpeechEvent(scenario, "mic-warmup-start", {});
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        micStreamRef.current = stream;
-        logSpeechEvent(scenario, "mic-warmup-success", {});
-
-        // Mic is ready — now start speech recognition
+    // ===== Acquire mic (reuses existing stream if alive) =====
+    const warmupAndStart = async () => {
+      const micReady = await ensureMicStream();
+      if (!micReady) {
         setIsPreparing(false);
-        setIsListening(true);
-        createAndStart();
-
-        // ===== STEP 2: No-speech timeout =====
-        // If nothing is detected within 8 seconds, fall back to text input
-        noSpeechTimerRef.current = setTimeout(() => {
-          if (!hasReceivedSpeechRef.current && !hasSubmittedRef.current && !isStoppingRef.current) {
-            logSpeechEvent(scenario, "no-speech-timeout", { seconds: 8 });
-            cleanup();
-            onFallbackRef.current();
-          }
-        }, 8000);
-      } catch (err: any) {
-        logSpeechEvent(scenario, "mic-warmup-failed", { error: err?.message || String(err) });
-        setIsPreparing(false);
-        cleanup();
+        cleanupSession();
         onFallbackRef.current();
+        return;
       }
+
+      // Mic is ready — now start speech recognition
+      setIsPreparing(false);
+      setIsListening(true);
+      createAndStart();
+
+      // No-speech timeout: if nothing detected in 8s, fall back to text
+      noSpeechTimerRef.current = setTimeout(() => {
+        if (!hasReceivedSpeechRef.current && !hasSubmittedRef.current && !isStoppingRef.current) {
+          logSpeechEvent(scenario, "no-speech-timeout", { seconds: 8 });
+          cleanupSession();
+          onFallbackRef.current();
+        }
+      }, 8000);
     };
 
-    warmupMic();
-  }, [scenario, lang, mode, autoStopSeconds, isSafari, isMobile, cleanup, submitFinal]);
+    warmupAndStart();
+  }, [scenario, lang, mode, autoStopSeconds, isSafari, isMobile, cleanupSession, submitFinal, ensureMicStream]);
 
   const stopListening = useCallback(() => {
     logSpeechEvent(scenario, "stop-requested", {
@@ -315,13 +343,14 @@ export function useSpeechRecognition({
     }, 600);
   }, [scenario, submitFinal]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount — this is where we release the mic
   useEffect(() => {
     return () => {
       isStoppingRef.current = true;
-      cleanup();
+      cleanupSession();
+      releaseMic();
     };
-  }, [cleanup]);
+  }, [cleanupSession, releaseMic]);
 
   return {
     isListening,
