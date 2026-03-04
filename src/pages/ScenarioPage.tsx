@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Trophy, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, Trophy, Volume2, VolumeX, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { scenarios } from "@/data/scenarios";
 import ConversationView from "@/components/ConversationView";
@@ -93,6 +93,13 @@ const ScenarioPage = () => {
             </h1>
             <p className="text-sm text-secondary font-medium italic">{scenario.dutchTitle}</p>
           </div>
+          <button
+            onClick={() => navigate("/settings")}
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            title="Settings"
+          >
+            <Settings className="h-5 w-5" />
+          </button>
           <button
             onClick={toggleMute}
             className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"

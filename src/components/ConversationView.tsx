@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { type ConversationTurn } from "@/data/scenarios";
 import { supabase } from "@/integrations/supabase/client";
+import { useRecordingSettings } from "@/hooks/useRecordingSettings";
 
 interface ConversationViewProps {
   turns: ConversationTurn[];
@@ -56,6 +57,8 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
   const recognitionRef = useRef<any>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const autoStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { settings: recordingSettings } = useRecordingSettings();
 
   const activeTurns = openEnded ? dynamicTurns : turns;
   const turn = activeTurns[currentTurn];
@@ -215,57 +218,109 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
   }, [turn, scenarioTitle, currentTurn, activeTurns.length, openEnded]);
 
   const startListening = useCallback(() => {
+    // Clear any existing auto-stop timer
+    if (autoStopTimerRef.current) {
+      clearTimeout(autoStopTimerRef.current);
+      autoStopTimerRef.current = null;
+    }
+
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setShowTextInput(true);
       return;
     }
 
+    // Request mic permission first, then start recognition
     navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-      const mediaRecorder = new MediaRecorder(stream);
-      audioChunksRef.current = [];
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      // Set up MediaRecorder for playback
+      try {
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' 
+          : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' 
+          : '';
+        const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+        audioChunksRef.current = [];
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) audioChunksRef.current.push(e.data);
+        };
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(audioChunksRef.current, { type: mimeType || "audio/webm" });
+          setRecordedAudioUrl(URL.createObjectURL(blob));
+          stream.getTracks().forEach((t) => t.stop());
+        };
+        mediaRecorder.start(100); // Collect data in 100ms chunks for mobile compatibility
+        mediaRecorderRef.current = mediaRecorder;
+      } catch {
+        // MediaRecorder not critical, continue with speech recognition
+      }
+
+      // Set up SpeechRecognition
+      const recognition = new SpeechRecognition();
+      recognition.lang = "nl-NL";
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 3;
+      recognition.continuous = recordingSettings.mode === "manual"; // Keep listening in manual mode
+
+      recognition.onresult = (event: any) => {
+        // Get the last result for continuous mode
+        const lastResult = event.results[event.results.length - 1];
+        if (lastResult.isFinal) {
+          const result = lastResult[0].transcript;
+          if (autoStopTimerRef.current) {
+            clearTimeout(autoStopTimerRef.current);
+            autoStopTimerRef.current = null;
+          }
+          setIsListening(false);
+          try { mediaRecorderRef.current?.stop(); } catch {}
+          recognitionRef.current = null;
+          evaluateWithAI(result);
+        }
       };
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        setRecordedAudioUrl(URL.createObjectURL(blob));
-        stream.getTracks().forEach((t) => t.stop());
+
+      recognition.onerror = (event: any) => {
+        console.log("Speech recognition error:", event.error);
+        // On mobile, "no-speech" is common - don't show text input for it
+        if (event.error === "no-speech" || event.error === "aborted") {
+          setIsListening(false);
+          try { mediaRecorderRef.current?.stop(); } catch {}
+        } else {
+          setIsListening(false);
+          try { mediaRecorderRef.current?.stop(); } catch {}
+          setShowTextInput(true);
+        }
       };
-      mediaRecorder.start();
-      mediaRecorderRef.current = mediaRecorder;
-    }).catch(() => {});
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = "nl-NL";
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 3;
+      recognition.onend = () => {
+        // On iOS/Safari, recognition can end prematurely
+        // Only update state if we haven't already processed a result
+        setIsListening(false);
+      };
 
-    recognition.onresult = (event: any) => {
-      const result = event.results[0][0].transcript;
-      setIsListening(false);
-      mediaRecorderRef.current?.stop();
-      evaluateWithAI(result);
-    };
+      recognitionRef.current = recognition;
+      recognition.start();
+      setIsListening(true);
 
-    recognition.onerror = () => {
-      setIsListening(false);
-      mediaRecorderRef.current?.stop();
+      // Auto-stop timer
+      if (recordingSettings.mode === "auto") {
+        autoStopTimerRef.current = setTimeout(() => {
+          try { recognitionRef.current?.stop(); } catch {}
+          try { mediaRecorderRef.current?.stop(); } catch {}
+          setIsListening(false);
+          autoStopTimerRef.current = null;
+        }, recordingSettings.autoStopSeconds * 1000);
+      }
+    }).catch((err) => {
+      console.error("Microphone access denied:", err);
       setShowTextInput(true);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    recognitionRef.current = recognition;
-    recognition.start();
-    setIsListening(true);
-  }, [evaluateWithAI]);
+    });
+  }, [evaluateWithAI, recordingSettings]);
 
   const stopListening = useCallback(() => {
-    recognitionRef.current?.stop();
-    mediaRecorderRef.current?.stop();
+    if (autoStopTimerRef.current) {
+      clearTimeout(autoStopTimerRef.current);
+      autoStopTimerRef.current = null;
+    }
+    try { recognitionRef.current?.stop(); } catch {}
+    try { mediaRecorderRef.current?.stop(); } catch {}
     setIsListening(false);
   }, []);
 
@@ -487,23 +542,32 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
               <motion.button
                 onClick={isListening ? stopListening : startListening}
                 whileTap={{ scale: 0.95 }}
-                className={`relative flex h-20 w-20 items-center justify-center rounded-full transition-colors ${
+                className={`relative flex h-20 w-20 items-center justify-center rounded-full transition-all duration-200 ${
                   isListening
-                    ? "bg-destructive text-destructive-foreground"
+                    ? "bg-destructive text-destructive-foreground scale-110"
                     : "bg-gradient-hero text-primary-foreground shadow-primary"
                 }`}
+                style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
               >
                 {isListening && (
-                  <span className="absolute inset-0 animate-pulse-ring rounded-full bg-destructive/30" />
+                  <>
+                    <span className="absolute inset-0 rounded-full bg-destructive/30 animate-ping" />
+                    <span className="absolute inset-[-4px] rounded-full border-2 border-destructive/50 animate-pulse" />
+                  </>
                 )}
                 {isListening ? (
-                  <MicOff className="h-8 w-8" />
+                  <MicOff className="h-8 w-8 relative z-10" />
                 ) : (
                   <Mic className="h-8 w-8" />
                 )}
               </motion.button>
               <p className="text-sm font-medium text-muted-foreground">
-                {isListening ? "Listening... speak Dutch!" : "Tap to speak your answer"}
+                {isListening
+                  ? recordingSettings.mode === "manual"
+                    ? "Recording... tap to stop"
+                    : `Listening... (${recordingSettings.autoStopSeconds}s)`
+                  : "Tap to speak your answer"
+                }
               </p>
             </div>
 

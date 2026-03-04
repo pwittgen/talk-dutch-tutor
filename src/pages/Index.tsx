@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Mic, BookOpen, MessageCircle, BarChart3 } from "lucide-react";
+import { Mic, BookOpen, MessageCircle, BarChart3, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { scenarios, sections } from "@/data/scenarios";
 import ScenarioCard from "@/components/ScenarioCard";
@@ -64,6 +64,13 @@ const Index = () => {
             >
               <BarChart3 className="h-4 w-4 text-secondary" />
               <span className="text-sm font-semibold text-foreground">My Progress</span>
+            </button>
+            <button
+              onClick={() => navigate("/settings")}
+              className="flex items-center gap-2 rounded-full bg-card px-4 py-2 shadow-card hover:shadow-card-hover transition-shadow"
+            >
+              <Settings className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-semibold text-foreground">Settings</span>
             </button>
           </motion.div>
         </div>
