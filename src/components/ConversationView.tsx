@@ -261,37 +261,52 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     const isManual = recordingSettings.mode === "manual";
     const recognition = new SpeechRecognition();
     recognition.lang = "nl-NL";
-    recognition.interimResults = false;
+    // CRITICAL: interimResults must be true for mobile Safari to fire results
+    recognition.interimResults = true;
     recognition.maxAlternatives = 3;
-    recognition.continuous = isManual;
+    recognition.continuous = true; // Always continuous — we control stop ourselves
 
     recognition.onresult = (event: any) => {
-      if (isManual) {
-        let fullTranscript = "";
-        for (let i = 0; i < event.results.length; i++) {
-          if (event.results[i].isFinal) {
-            fullTranscript += event.results[i][0].transcript + " ";
-          }
+      // Accumulate all final transcripts + latest interim
+      let finalTranscript = "";
+      let interimTranscript = "";
+      for (let i = 0; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript + " ";
+        } else {
+          interimTranscript = event.results[i][0].transcript;
         }
-        manualTranscriptRef.current = fullTranscript.trim();
-      } else {
-        const lastResult = event.results[event.results.length - 1];
-        if (lastResult.isFinal) {
-          const result = lastResult[0].transcript;
-          if (autoStopTimerRef.current) {
-            clearTimeout(autoStopTimerRef.current);
-            autoStopTimerRef.current = null;
-          }
-          setIsListening(false);
-          cleanupRecording();
-          evaluateWithAI(result);
+      }
+      const bestTranscript = (finalTranscript.trim() || interimTranscript.trim());
+      manualTranscriptRef.current = bestTranscript;
+
+      // In auto mode, submit on first final result
+      if (!isManual && finalTranscript.trim()) {
+        if (autoStopTimerRef.current) {
+          clearTimeout(autoStopTimerRef.current);
+          autoStopTimerRef.current = null;
         }
+        try { recognitionRef.current?.stop(); } catch {}
+        recognitionRef.current = null;
+        setIsListening(false);
+        cleanupRecording();
+        evaluateWithAI(finalTranscript.trim());
+        manualTranscriptRef.current = "";
       }
     };
 
     recognition.onerror = (event: any) => {
       console.log("Speech recognition error:", event.error);
-      if (event.error !== "no-speech" && event.error !== "aborted") {
+      if (event.error === "no-speech" || event.error === "aborted") {
+        // Non-critical — submit what we have if anything
+        if (manualTranscriptRef.current) {
+          setIsListening(false);
+          cleanupRecording();
+          evaluateWithAI(manualTranscriptRef.current);
+          manualTranscriptRef.current = "";
+          return;
+        }
+      } else {
         setShowTextInput(true);
       }
       setIsListening(false);
@@ -299,55 +314,44 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     };
 
     recognition.onend = () => {
-      if (isManual && isStoppingManuallyRef.current && manualTranscriptRef.current) {
+      // Submit accumulated transcript if we have one
+      if (manualTranscriptRef.current) {
         setIsListening(false);
         cleanupRecording();
         evaluateWithAI(manualTranscriptRef.current);
         manualTranscriptRef.current = "";
         return;
       }
+      // If still supposed to be listening (e.g., browser auto-stopped), restart
+      if (!isStoppingManuallyRef.current && isManual && recognitionRef.current) {
+        try { recognition.start(); } catch {}
+        return;
+      }
       setIsListening(false);
     };
 
     recognitionRef.current = recognition;
-    // Start recognition directly from user gesture — this is critical for mobile browsers
+    // Start recognition directly from user gesture — critical for mobile browsers
     recognition.start();
     setIsListening(true);
 
     // Auto-stop timer (only in auto mode)
     if (!isManual) {
       autoStopTimerRef.current = setTimeout(() => {
+        isStoppingManuallyRef.current = true;
         try { recognitionRef.current?.stop(); } catch {}
-        cleanupRecording();
-        setIsListening(false);
+        // If no transcript was captured, just clean up
+        if (!manualTranscriptRef.current) {
+          cleanupRecording();
+          setIsListening(false);
+        }
         autoStopTimerRef.current = null;
       }, recordingSettings.autoStopSeconds * 1000);
     }
 
-    // Start MediaRecorder in background (non-blocking, not needed for gesture)
-    navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-      streamRef.current = stream;
-      try {
-        const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
-          : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4'
-          : '';
-        const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-        audioChunksRef.current = [];
-        mediaRecorder.ondataavailable = (e) => {
-          if (e.data.size > 0) audioChunksRef.current.push(e.data);
-        };
-        mediaRecorder.onstop = () => {
-          const blob = new Blob(audioChunksRef.current, { type: mimeType || "audio/webm" });
-          setRecordedAudioUrl(URL.createObjectURL(blob));
-        };
-        mediaRecorder.start(100);
-        mediaRecorderRef.current = mediaRecorder;
-      } catch {
-        // MediaRecorder not critical
-      }
-    }).catch(() => {
-      // MediaRecorder failure is non-critical, speech recognition still works
-    });
+    // NOTE: Deliberately NOT calling getUserMedia here.
+    // On mobile Chrome, the permission dialog from getUserMedia interferes with
+    // SpeechRecognition that's already running. MediaRecorder is non-essential.
   }, [evaluateWithAI, recordingSettings, cleanupRecording]);
 
   const stopListening = useCallback(() => {
