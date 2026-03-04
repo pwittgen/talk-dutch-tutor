@@ -7,7 +7,7 @@ import { Slider } from "@/components/ui/slider";
 import { type ConversationTurn } from "@/data/scenarios";
 import { supabase } from "@/integrations/supabase/client";
 import { useRecordingSettings } from "@/hooks/useRecordingSettings";
-import { logSpeechEvent } from "@/lib/speechDebugLog";
+import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 
 interface ConversationViewProps {
   turns: ConversationTurn[];
@@ -43,7 +43,6 @@ const gradeConfig = {
 
 const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, muted, onComplete }: ConversationViewProps) => {
   const [currentTurn, setCurrentTurn] = useState(0);
-  const [isListening, setIsListening] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
   const [showTextInput, setShowTextInput] = useState(false);
   const [textInput, setTextInput] = useState("");
@@ -55,13 +54,6 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
   const [dynamicTurns, setDynamicTurns] = useState<ConversationTurn[]>([...turns]);
   const [conversationHistory, setConversationHistory] = useState<Array<{ dutch: string; studentResponse?: string }>>([]);
   const [isGeneratingTurn, setIsGeneratingTurn] = useState(false);
-  const recognitionRef = useRef<any>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const autoStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const manualTranscriptRef = useRef<string>("");
-  const isStoppingManuallyRef = useRef(false);
-  const streamRef = useRef<MediaStream | null>(null);
   const { settings: recordingSettings } = useRecordingSettings();
 
   const activeTurns = openEnded ? dynamicTurns : turns;
@@ -153,18 +145,6 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     }
   }, [turn, speechRate, muted, fetchTtsBlob, preloadNextTurn]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (autoStopTimerRef.current) clearTimeout(autoStopTimerRef.current);
-      try { recognitionRef.current?.stop(); } catch {}
-      try { mediaRecorderRef.current?.stop(); } catch {}
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-      }
-    };
-  }, []);
-
   // Auto-play dialogue when turn changes
   useEffect(() => {
     if (!muted && turn) {
@@ -233,184 +213,14 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     }
   }, [turn, scenarioTitle, currentTurn, activeTurns.length, openEnded]);
 
-  const cleanupRecording = useCallback(() => {
-    try { mediaRecorderRef.current?.stop(); } catch {}
-    mediaRecorderRef.current = null;
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-  }, []);
-
-  const startListening = useCallback(() => {
-    // Clear any existing auto-stop timer
-    if (autoStopTimerRef.current) {
-      clearTimeout(autoStopTimerRef.current);
-      autoStopTimerRef.current = null;
-    }
-    manualTranscriptRef.current = "";
-    isStoppingManuallyRef.current = false;
-
-    const scenarioCtx = scenarioTitle;
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      logSpeechEvent(scenarioCtx, "no-speech-api", { message: "SpeechRecognition not available" });
-      setShowTextInput(true);
-      return;
-    }
-
-    // CRITICAL: Start SpeechRecognition DIRECTLY in the click handler (user gesture)
-    const isManual = recordingSettings.mode === "manual";
-    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-    const recognition = new SpeechRecognition();
-    recognition.lang = "nl-NL";
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 3;
-    // Safari doesn't handle continuous well — disable it there
-    recognition.continuous = !isSafari;
-
-    logSpeechEvent(scenarioCtx, "record-button-clicked", {
-      mode: isManual ? "manual" : "auto",
-      isSafari,
-      continuous: !isSafari,
-      autoStopSeconds: recordingSettings.autoStopSeconds,
-      turnIndex: currentTurn,
-      turnDutch: turn?.dutchText?.substring(0, 80),
-    });
-
-    let hasSubmitted = false;
-    const submitTranscript = (source: string) => {
-      if (hasSubmitted) return;
-      const transcript = manualTranscriptRef.current;
-      if (!transcript) {
-        logSpeechEvent(scenarioCtx, "submit-skipped-empty", { source });
-        return;
-      }
-      hasSubmitted = true;
-      logSpeechEvent(scenarioCtx, "submit-transcript", { source, transcript });
-      console.log(`[Speech] Submitting from ${source}: "${transcript}"`);
-      manualTranscriptRef.current = "";
-      if (autoStopTimerRef.current) {
-        clearTimeout(autoStopTimerRef.current);
-        autoStopTimerRef.current = null;
-      }
-      try { recognitionRef.current?.stop(); } catch {}
-      recognitionRef.current = null;
-      setIsListening(false);
-      cleanupRecording();
-      evaluateWithAI(transcript);
-    };
-
-    recognition.onresult = (event: any) => {
-      let finalTranscript = "";
-      let interimTranscript = "";
-      for (let i = 0; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript + " ";
-        } else {
-          interimTranscript = event.results[i][0].transcript;
-        }
-      }
-      const bestTranscript = (finalTranscript.trim() || interimTranscript.trim());
-      logSpeechEvent(scenarioCtx, "onresult", { final: finalTranscript.trim(), interim: interimTranscript.trim(), best: bestTranscript });
-      console.log(`[Speech] onresult — final: "${finalTranscript.trim()}", interim: "${interimTranscript.trim()}", best: "${bestTranscript}"`);
-      manualTranscriptRef.current = bestTranscript;
-
-      // In auto mode, submit on first final result (non-Safari)
-      if (!isManual && finalTranscript.trim() && !isSafari) {
-        submitTranscript("onresult-final");
-      }
-    };
-
-    recognition.onerror = (event: any) => {
-      logSpeechEvent(scenarioCtx, "onerror", { error: event.error, message: event.message });
-      console.log("[Speech] onerror:", event.error);
-      if (event.error === "no-speech" || event.error === "aborted") {
-        submitTranscript("onerror");
-        if (!hasSubmitted) {
-          setIsListening(false);
-          cleanupRecording();
-        }
-      } else {
-        logSpeechEvent(scenarioCtx, "error-fallback-textinput", { error: event.error });
-        setShowTextInput(true);
-        setIsListening(false);
-        cleanupRecording();
-      }
-    };
-
-    recognition.onend = () => {
-      logSpeechEvent(scenarioCtx, "onend", { hasSubmitted, transcript: manualTranscriptRef.current, isStoppingManually: isStoppingManuallyRef.current });
-      console.log(`[Speech] onend — hasSubmitted: ${hasSubmitted}, transcript: "${manualTranscriptRef.current}"`);
-      if (hasSubmitted) return;
-
-      // Safari may fire onend before final onresult — wait a tick
-      setTimeout(() => {
-        if (hasSubmitted) return;
-        
-        if (manualTranscriptRef.current) {
-          submitTranscript("onend");
-          return;
-        }
-        // If still supposed to be listening (manual mode, browser auto-stopped), restart
-        if (!isStoppingManuallyRef.current && isManual && recognitionRef.current) {
-          logSpeechEvent(scenarioCtx, "restart-after-autoend", { mode: "manual" });
-          try { recognition.start(); } catch {}
-          return;
-        }
-        logSpeechEvent(scenarioCtx, "ended-no-transcript", { isStoppingManually: isStoppingManuallyRef.current });
-        setIsListening(false);
-      }, 300); // 300ms grace period for Safari
-    };
-
-    recognitionRef.current = recognition;
-    try {
-      recognition.start();
-      setIsListening(true);
-      logSpeechEvent(scenarioCtx, "recognition-started", { mode: isManual ? "manual" : "auto", isSafari, continuous: !isSafari });
-      console.log(`[Speech] Started — mode: ${isManual ? "manual" : "auto"}, safari: ${isSafari}, continuous: ${!isSafari}`);
-    } catch (err: any) {
-      logSpeechEvent(scenarioCtx, "start-failed", { error: err?.message || String(err) });
-      setShowTextInput(true);
-    }
-
-    // Auto-stop timer (only in auto mode)
-    if (!isManual) {
-      autoStopTimerRef.current = setTimeout(() => {
-        console.log(`[Speech] Auto-stop timer fired — transcript: "${manualTranscriptRef.current}"`);
-        isStoppingManuallyRef.current = true;
-        try { recognitionRef.current?.stop(); } catch {}
-        // Give onend/onresult a moment, then force submit
-        setTimeout(() => {
-          submitTranscript("auto-stop-timer");
-          if (!hasSubmitted) {
-            recognitionRef.current = null;
-            cleanupRecording();
-            setIsListening(false);
-          }
-        }, 500);
-        autoStopTimerRef.current = null;
-      }, recordingSettings.autoStopSeconds * 1000);
-    }
-
-    // NOTE: Deliberately NOT calling getUserMedia here.
-    // On mobile Chrome, the permission dialog from getUserMedia interferes with
-    // SpeechRecognition that's already running. MediaRecorder is non-essential.
-  }, [evaluateWithAI, recordingSettings, cleanupRecording]);
-
-  const stopListening = useCallback(() => {
-    if (autoStopTimerRef.current) {
-      clearTimeout(autoStopTimerRef.current);
-      autoStopTimerRef.current = null;
-    }
-    isStoppingManuallyRef.current = true;
-    try { recognitionRef.current?.stop(); } catch {}
-    // Don't cleanup recording here - let onend handle it for manual mode
-    if (recordingSettings.mode !== "manual") {
-      cleanupRecording();
-      setIsListening(false);
-    }
-  }, [cleanupRecording, recordingSettings.mode]);
+  const { isListening, interimText, startListening, stopListening } = useSpeechRecognition({
+    scenario: scenarioTitle,
+    lang: "nl-NL",
+    onTranscript: evaluateWithAI,
+    onFallbackToText: () => setShowTextInput(true),
+    mode: recordingSettings.mode,
+    autoStopSeconds: recordingSettings.autoStopSeconds,
+  });
 
   const handleTextSubmit = () => {
     if (textInput.trim()) {
@@ -657,6 +467,11 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
                   : "Tap to speak your answer"
                 }
               </p>
+              {isListening && interimText && (
+                <p className="text-xs text-muted-foreground/70 italic max-w-xs text-center truncate">
+                  "{interimText}"
+                </p>
+              )}
             </div>
 
             {/* Text input fallback */}

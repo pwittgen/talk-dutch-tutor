@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { type ExamQuestion, opgaveDescriptions } from "@/data/examQuestions";
 import { supabase } from "@/integrations/supabase/client";
+import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 
 interface ExamSimulationProps {
   questions: ExamQuestion[];
@@ -21,7 +22,6 @@ export interface ExamResult {
 const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [results, setResults] = useState<Record<number, ExamResult>>({});
-  const [isListening, setIsListening] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [feedback, setFeedback] = useState<{ text: string; stars: number; correctedDutch?: string } | null>(null);
@@ -30,11 +30,7 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
   const [showHints, setShowHints] = useState(false);
   const [generatedImages, setGeneratedImages] = useState<Record<string, string>>({});
   const [loadingImage, setLoadingImage] = useState<string | null>(null);
-  const [recordingDuration, setRecordingDuration] = useState(0);
   const [examElapsed, setExamElapsed] = useState(0);
-  const recognitionRef = useRef<any>(null);
-  const manualTranscriptRef = useRef("");
-  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const examTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const question = questions[currentIndex];
@@ -51,24 +47,6 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
     };
   }, []);
 
-  // Recording duration timer
-  useEffect(() => {
-    if (isListening) {
-      setRecordingDuration(0);
-      recordingTimerRef.current = setInterval(() => {
-        setRecordingDuration(prev => prev + 1);
-      }, 1000);
-    } else {
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-        recordingTimerRef.current = null;
-      }
-      setRecordingDuration(0);
-    }
-    return () => {
-      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-    };
-  }, [isListening]);
 
   const imageKey = (qId: number, idx: number) => `${qId}-${idx}`;
 
@@ -145,136 +123,15 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
     }
   }, [question, currentIndex, questions.length, opgaveInfo]);
 
-  const startListening = useCallback(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      console.warn("[Exam] SpeechRecognition not supported");
-      setShowTextInput(true);
-      return;
-    }
-
-    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-    const recognition = new SpeechRecognition();
-    recognition.lang = "nl-NL";
-    recognition.interimResults = true;
-    recognition.continuous = !isSafari;
-    manualTranscriptRef.current = "";
-
-    let hasSubmitted = false;
-    let isStoppingManually = false;
-
-    recognition.onresult = (event: any) => {
-      let finalTranscript = "";
-      let interimTranscript = "";
-      for (let i = 0; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript + " ";
-        } else {
-          interimTranscript = event.results[i][0].transcript;
-        }
-      }
-      manualTranscriptRef.current = (finalTranscript.trim() || interimTranscript.trim());
-      console.log(`[Exam] onresult — transcript: "${manualTranscriptRef.current}"`);
-    };
-
-    recognition.onend = () => {
-      console.log(`[Exam] onend — stopping: ${isStoppingManually}, transcript: "${manualTranscriptRef.current}"`);
-      // If user hasn't clicked stop yet (Safari auto-stops), restart
-      if (!isStoppingManually && !hasSubmitted) {
-        if (manualTranscriptRef.current && isSafari) {
-          // Safari ended after getting speech — restart to keep listening
-          try { recognition.start(); return; } catch {}
-        }
-        if (!manualTranscriptRef.current) {
-          // No speech yet, restart
-          try { recognition.start(); return; } catch {}
-        }
-      }
-      setTimeout(() => {
-        if (hasSubmitted) return;
-        // Stop the recording timer
-        if (recordingTimerRef.current) {
-          clearInterval(recordingTimerRef.current);
-          recordingTimerRef.current = null;
-        }
-        if (manualTranscriptRef.current) {
-          hasSubmitted = true;
-          setIsListening(false);
-          setRecordingDuration(0);
-          evaluateAnswer(manualTranscriptRef.current);
-        } else {
-          setIsListening(false);
-          setRecordingDuration(0);
-        }
-      }, 300);
-    };
-
-    recognition.onerror = (event: any) => {
-      console.warn("[Exam] onerror:", event.error);
-      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-        setShowTextInput(true);
-        setIsListening(false);
-        if (recordingTimerRef.current) {
-          clearInterval(recordingTimerRef.current);
-          recordingTimerRef.current = null;
-        }
-        setRecordingDuration(0);
-        return;
-      }
-      // For no-speech or aborted, try to submit what we have
-      if (event.error === "no-speech" || event.error === "aborted") {
-        if (manualTranscriptRef.current && !hasSubmitted) {
-          hasSubmitted = true;
-          setIsListening(false);
-          setRecordingDuration(0);
-          if (recordingTimerRef.current) {
-            clearInterval(recordingTimerRef.current);
-            recordingTimerRef.current = null;
-          }
-          evaluateAnswer(manualTranscriptRef.current);
-          return;
-        }
-      }
-      setShowTextInput(true);
-      setIsListening(false);
-      setRecordingDuration(0);
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-        recordingTimerRef.current = null;
-      }
-    };
-
-    // Store a way to signal manual stop
-    (recognition as any).__stopManually = () => { isStoppingManually = true; };
-
-    recognitionRef.current = recognition;
-
-    try {
-      recognition.start();
-      setIsListening(true);
-      setRecordingDuration(0);
-      // Start recording duration timer
-      recordingTimerRef.current = setInterval(() => {
-        setRecordingDuration(prev => prev + 1);
-      }, 1000);
-      console.log("[Exam] Recognition started");
-    } catch (err) {
-      console.error("[Exam] Failed to start recognition:", err);
-      setShowTextInput(true);
-    }
-  }, [evaluateAnswer]);
-
-  const stopListening = useCallback(() => {
-    console.log("[Exam] stopListening called");
-    if (recordingTimerRef.current) {
-      clearInterval(recordingTimerRef.current);
-      recordingTimerRef.current = null;
-    }
-    try {
-      (recognitionRef.current as any)?.__stopManually?.();
-      recognitionRef.current?.stop();
-    } catch {}
-  }, []);
+  // Hook up speech recognition via the shared hook
+  const { isListening, interimText: examInterimText, startListening, stopListening } = useSpeechRecognition({
+    scenario: `Exam Q${currentIndex + 1}`,
+    lang: "nl-NL",
+    onTranscript: evaluateAnswer,
+    onFallbackToText: useCallback(() => setShowTextInput(true), []),
+    mode: "manual",
+    autoStopSeconds: 30,
+  });
 
   const handleTextSubmit = () => {
     if (textInput.trim()) {
@@ -505,8 +362,13 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
                     <span className="relative inline-flex rounded-full h-3 w-3 bg-destructive" />
                   </span>
                   <span className="text-sm font-bold text-destructive">
-                    Opname {formatTime(recordingDuration)}
+                    Opname...
                   </span>
+                  {examInterimText && (
+                    <span className="text-xs text-muted-foreground italic truncate max-w-[200px]">
+                      "{examInterimText}"
+                    </span>
+                  )}
                   <span className="text-xs text-muted-foreground">
                     Druk op stop als u klaar bent
                   </span>
