@@ -2,30 +2,32 @@
 
 ## Analysis
 
-The current `useSpeechRecognition` hook calls `recognition.start()` immediately on button press. On mobile Safari/Chrome, the browser may still be initializing the audio pipeline, leading to silent failures or empty transcripts.
+Two issues found in the logs and code:
 
-A "readiness gate" — pre-warming the microphone with `getUserMedia` before starting speech recognition — would solve this without a visible waiting period. The user taps the mic, we grab the audio stream (which also triggers the permission prompt if needed), and only then start recognition. This adds ~200-500ms but the user sees the button go into "listening" state, so it feels instant.
+### Issue 1: Speech Recognition loses gesture context
+In `startListening`, the `warmupAndStart` async function does `await ensureMicStream()` before calling `createAndStart()`. On mobile Safari, after an `await`, the user gesture context is lost. This means `recognition.start()` runs outside a trusted gesture, causing Safari to silently fail to capture audio. This explains why the mic "starts" (green indicators) but captures nothing (`submit-empty`).
+
+### Issue 2: TTS not playing on next turn
+The auto-play effect (line 149) fires `speakDutch()` inside a `setTimeout` within `useEffect`. This is not a user gesture context, so Safari blocks audio playback on turn transitions.
 
 ## Plan
 
-### 1. Add microphone pre-warming to `useSpeechRecognition.ts`
+### 1. Fix gesture context in `useSpeechRecognition.ts`
 
-In `startListening`, before calling `createAndStart()`:
+Restructure `startListening` so that `recognition.start()` is called **synchronously** from the click handler, not after an `await`:
 
-- Call `navigator.mediaDevices.getUserMedia({ audio: true })` to acquire the mic stream
-- Store the stream in a new `micStreamRef`
-- Only call `createAndStart()` after the stream is acquired
-- If `getUserMedia` fails (permission denied, no mic), call `onFallbackToText` immediately
-- In `cleanup()`, stop all tracks on `micStreamRef.current` to release the mic hardware
+- Track whether mic permission has been acquired at least once (`micAcquiredRef`)
+- On first call: `await getUserMedia` then `createAndStart()` (user expects a brief delay)
+- On subsequent calls: call `createAndStart()` **immediately** (synchronously), and refresh the `getUserMedia` stream in the background (fire-and-forget) — this preserves the gesture context chain
+- This ensures Safari's audio pipeline is activated by the trusted gesture
 
-### 2. Delay auto-stop timer until first speech detected
+### 2. Fix TTS playback on turn change in `ConversationView.tsx`
 
-- Add a `hasReceivedSpeechRef` flag, set to `true` on first `onresult`
-- Start the auto-stop timer only after first `onresult`, not at the beginning
-- Add a separate 8-second "no speech at all" timeout that triggers text input fallback if nothing is detected
+- In `handleNext`, call `speakDutch()` directly after setting the next turn (within the click handler's gesture context), instead of relying on the `useEffect` + `setTimeout`
+- Keep the `useEffect` only for the initial mount/first turn
+- This ensures Safari allows audio playback since it's triggered from a user gesture
 
-### 3. Show a brief "Preparing mic..." state
+### 3. Clean up cancel flow
 
-- Add a `isPreparing` state to the hook return value (true between button press and mic acquired)
-- In `ConversationView.tsx` and `ExamSimulation.tsx`, show a subtle loading indicator on the mic button during this brief phase
+- Ensure `cancelListening` resets all refs properly so the next `startListening` works cleanly
 
