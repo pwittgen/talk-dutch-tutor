@@ -131,8 +131,9 @@ const ExamPage = () => {
               Inburgering Speaking Exam
             </h2>
             <p className="text-muted-foreground max-w-md mx-auto">
-              Practice the real exam format: 12 photo-based questions. Look at each photo, 
-              listen to the question, and answer in Dutch. No dialogue — just like the real test.
+              Practice the real DUO A2 Spreken exam format: 12 photo-based questions. 
+              Read the situation, look at the photo, and answer in Dutch. 
+              Keep your answers short and simple — just like the real test.
             </p>
 
             <div className="grid grid-cols-3 gap-4 max-w-sm mx-auto text-center">
@@ -153,10 +154,10 @@ const ExamPage = () => {
             <div className="rounded-xl bg-muted/50 p-4 max-w-md mx-auto text-left">
               <p className="text-sm font-bold text-foreground mb-2">Exam tips:</p>
               <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• Describe what you see in the photo</li>
-                <li>• Use complete sentences</li>
-                <li>• Share your opinion when asked</li>
-                <li>• Speak clearly and at a normal pace</li>
+                <li>• Keep answers short: 1-2 sentences is perfect</li>
+                <li>• Answer the question directly</li>
+                <li>• Use simple words you know well</li>
+                <li>• You control the recording — start and stop manually</li>
               </ul>
             </div>
 
