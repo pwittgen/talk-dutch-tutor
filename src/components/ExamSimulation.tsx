@@ -148,6 +148,7 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
   const startListening = useCallback(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
+      console.warn("[Exam] SpeechRecognition not supported");
       setShowTextInput(true);
       return;
     }
@@ -160,6 +161,7 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
     manualTranscriptRef.current = "";
 
     let hasSubmitted = false;
+    let isStoppingManually = false;
 
     recognition.onresult = (event: any) => {
       let finalTranscript = "";
@@ -172,34 +174,107 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
         }
       }
       manualTranscriptRef.current = (finalTranscript.trim() || interimTranscript.trim());
+      console.log(`[Exam] onresult — transcript: "${manualTranscriptRef.current}"`);
     };
 
     recognition.onend = () => {
+      console.log(`[Exam] onend — stopping: ${isStoppingManually}, transcript: "${manualTranscriptRef.current}"`);
+      // If user hasn't clicked stop yet (Safari auto-stops), restart
+      if (!isStoppingManually && !hasSubmitted) {
+        if (manualTranscriptRef.current && isSafari) {
+          // Safari ended after getting speech — restart to keep listening
+          try { recognition.start(); return; } catch {}
+        }
+        if (!manualTranscriptRef.current) {
+          // No speech yet, restart
+          try { recognition.start(); return; } catch {}
+        }
+      }
       setTimeout(() => {
         if (hasSubmitted) return;
+        // Stop the recording timer
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current);
+          recordingTimerRef.current = null;
+        }
         if (manualTranscriptRef.current) {
           hasSubmitted = true;
           setIsListening(false);
+          setRecordingDuration(0);
           evaluateAnswer(manualTranscriptRef.current);
         } else {
           setIsListening(false);
+          setRecordingDuration(0);
         }
       }, 300);
     };
 
-    recognition.onerror = () => {
+    recognition.onerror = (event: any) => {
+      console.warn("[Exam] onerror:", event.error);
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        setShowTextInput(true);
+        setIsListening(false);
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current);
+          recordingTimerRef.current = null;
+        }
+        setRecordingDuration(0);
+        return;
+      }
+      // For no-speech or aborted, try to submit what we have
+      if (event.error === "no-speech" || event.error === "aborted") {
+        if (manualTranscriptRef.current && !hasSubmitted) {
+          hasSubmitted = true;
+          setIsListening(false);
+          setRecordingDuration(0);
+          if (recordingTimerRef.current) {
+            clearInterval(recordingTimerRef.current);
+            recordingTimerRef.current = null;
+          }
+          evaluateAnswer(manualTranscriptRef.current);
+          return;
+        }
+      }
       setShowTextInput(true);
       setIsListening(false);
+      setRecordingDuration(0);
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
     };
 
+    // Store a way to signal manual stop
+    (recognition as any).__stopManually = () => { isStoppingManually = true; };
+
     recognitionRef.current = recognition;
-    recognition.start();
-    setIsListening(true);
+
+    try {
+      recognition.start();
+      setIsListening(true);
+      setRecordingDuration(0);
+      // Start recording duration timer
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
+      console.log("[Exam] Recognition started");
+    } catch (err) {
+      console.error("[Exam] Failed to start recognition:", err);
+      setShowTextInput(true);
+    }
   }, [evaluateAnswer]);
 
-  const stopListening = () => {
-    try { recognitionRef.current?.stop(); } catch {}
-  };
+  const stopListening = useCallback(() => {
+    console.log("[Exam] stopListening called");
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    try {
+      (recognitionRef.current as any)?.__stopManually?.();
+      recognitionRef.current?.stop();
+    } catch {}
+  }, []);
 
   const handleTextSubmit = () => {
     if (textInput.trim()) {
