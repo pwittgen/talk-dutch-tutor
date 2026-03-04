@@ -257,17 +257,35 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     }
 
     // CRITICAL: Start SpeechRecognition DIRECTLY in the click handler (user gesture)
-    // Do NOT put this inside an async callback like getUserMedia().then()
     const isManual = recordingSettings.mode === "manual";
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
     const recognition = new SpeechRecognition();
     recognition.lang = "nl-NL";
-    // CRITICAL: interimResults must be true for mobile Safari to fire results
     recognition.interimResults = true;
     recognition.maxAlternatives = 3;
-    recognition.continuous = true; // Always continuous — we control stop ourselves
+    // Safari doesn't handle continuous well — disable it there
+    recognition.continuous = !isSafari;
+
+    let hasSubmitted = false;
+    const submitTranscript = (source: string) => {
+      if (hasSubmitted) return;
+      const transcript = manualTranscriptRef.current;
+      if (!transcript) return;
+      hasSubmitted = true;
+      console.log(`[Speech] Submitting from ${source}: "${transcript}"`);
+      manualTranscriptRef.current = "";
+      if (autoStopTimerRef.current) {
+        clearTimeout(autoStopTimerRef.current);
+        autoStopTimerRef.current = null;
+      }
+      try { recognitionRef.current?.stop(); } catch {}
+      recognitionRef.current = null;
+      setIsListening(false);
+      cleanupRecording();
+      evaluateWithAI(transcript);
+    };
 
     recognition.onresult = (event: any) => {
-      // Accumulate all final transcripts + latest interim
       let finalTranscript = "";
       let interimTranscript = "";
       for (let i = 0; i < event.results.length; i++) {
@@ -278,83 +296,71 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
         }
       }
       const bestTranscript = (finalTranscript.trim() || interimTranscript.trim());
+      console.log(`[Speech] onresult — final: "${finalTranscript.trim()}", interim: "${interimTranscript.trim()}", best: "${bestTranscript}"`);
       manualTranscriptRef.current = bestTranscript;
 
-      // In auto mode, submit on first final result
-      if (!isManual && finalTranscript.trim()) {
-        if (autoStopTimerRef.current) {
-          clearTimeout(autoStopTimerRef.current);
-          autoStopTimerRef.current = null;
-        }
-        try { recognitionRef.current?.stop(); } catch {}
-        recognitionRef.current = null;
-        setIsListening(false);
-        cleanupRecording();
-        evaluateWithAI(finalTranscript.trim());
-        manualTranscriptRef.current = "";
+      // In auto mode, submit on first final result (non-Safari)
+      if (!isManual && finalTranscript.trim() && !isSafari) {
+        submitTranscript("onresult-final");
       }
     };
 
     recognition.onerror = (event: any) => {
-      console.log("Speech recognition error:", event.error);
+      console.log("[Speech] onerror:", event.error);
       if (event.error === "no-speech" || event.error === "aborted") {
-        // Non-critical — submit what we have if anything
-        if (manualTranscriptRef.current) {
+        submitTranscript("onerror");
+        if (!hasSubmitted) {
           setIsListening(false);
           cleanupRecording();
-          evaluateWithAI(manualTranscriptRef.current);
-          manualTranscriptRef.current = "";
-          return;
         }
       } else {
         setShowTextInput(true);
+        setIsListening(false);
+        cleanupRecording();
       }
-      setIsListening(false);
-      cleanupRecording();
     };
 
     recognition.onend = () => {
-      // If auto-stop already handled submission, do nothing
-      if (isStoppingManuallyRef.current && !manualTranscriptRef.current) {
+      console.log(`[Speech] onend — hasSubmitted: ${hasSubmitted}, transcript: "${manualTranscriptRef.current}"`);
+      if (hasSubmitted) return;
+
+      // Safari may fire onend before final onresult — wait a tick
+      setTimeout(() => {
+        if (hasSubmitted) return;
+        
+        if (manualTranscriptRef.current) {
+          submitTranscript("onend");
+          return;
+        }
+        // If still supposed to be listening (manual mode, browser auto-stopped), restart
+        if (!isStoppingManuallyRef.current && isManual && recognitionRef.current) {
+          try { recognition.start(); } catch {}
+          return;
+        }
         setIsListening(false);
-        return;
-      }
-      // Submit accumulated transcript if we have one
-      if (manualTranscriptRef.current) {
-        const transcript = manualTranscriptRef.current;
-        manualTranscriptRef.current = "";
-        setIsListening(false);
-        cleanupRecording();
-        evaluateWithAI(transcript);
-        return;
-      }
-      // If still supposed to be listening (e.g., browser auto-stopped), restart
-      if (!isStoppingManuallyRef.current && isManual && recognitionRef.current) {
-        try { recognition.start(); } catch {}
-        return;
-      }
-      setIsListening(false);
+      }, 300); // 300ms grace period for Safari
     };
 
     recognitionRef.current = recognition;
-    // Start recognition directly from user gesture — critical for mobile browsers
     recognition.start();
     setIsListening(true);
+    console.log(`[Speech] Started — mode: ${isManual ? "manual" : "auto"}, safari: ${isSafari}, continuous: ${!isSafari}`);
 
     // Auto-stop timer (only in auto mode)
     if (!isManual) {
       autoStopTimerRef.current = setTimeout(() => {
+        console.log(`[Speech] Auto-stop timer fired — transcript: "${manualTranscriptRef.current}"`);
         isStoppingManuallyRef.current = true;
-        const transcript = manualTranscriptRef.current;
         try { recognitionRef.current?.stop(); } catch {}
-        recognitionRef.current = null;
-        cleanupRecording();
-        setIsListening(false);
-        // Directly submit whatever we captured — don't rely on onend
-        if (transcript) {
-          manualTranscriptRef.current = "";
-          evaluateWithAI(transcript);
-        }
+        // Give onend/onresult a moment, then force submit
+        setTimeout(() => {
+          submitTranscript("auto-stop-timer");
+          if (!hasSubmitted) {
+            recognitionRef.current = null;
+            cleanupRecording();
+            setIsListening(false);
+          }
+        }, 500);
         autoStopTimerRef.current = null;
       }, recordingSettings.autoStopSeconds * 1000);
     }
