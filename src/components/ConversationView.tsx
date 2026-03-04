@@ -232,6 +232,15 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     }
   }, [turn, scenarioTitle, currentTurn, activeTurns.length, openEnded]);
 
+  const cleanupRecording = useCallback(() => {
+    try { mediaRecorderRef.current?.stop(); } catch {}
+    mediaRecorderRef.current = null;
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+  }, []);
+
   const startListening = useCallback(() => {
     // Clear any existing auto-stop timer
     if (autoStopTimerRef.current) {
@@ -247,10 +256,77 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
       return;
     }
 
+    // CRITICAL: Start SpeechRecognition DIRECTLY in the click handler (user gesture)
+    // Do NOT put this inside an async callback like getUserMedia().then()
+    const isManual = recordingSettings.mode === "manual";
+    const recognition = new SpeechRecognition();
+    recognition.lang = "nl-NL";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 3;
+    recognition.continuous = isManual;
+
+    recognition.onresult = (event: any) => {
+      if (isManual) {
+        let fullTranscript = "";
+        for (let i = 0; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            fullTranscript += event.results[i][0].transcript + " ";
+          }
+        }
+        manualTranscriptRef.current = fullTranscript.trim();
+      } else {
+        const lastResult = event.results[event.results.length - 1];
+        if (lastResult.isFinal) {
+          const result = lastResult[0].transcript;
+          if (autoStopTimerRef.current) {
+            clearTimeout(autoStopTimerRef.current);
+            autoStopTimerRef.current = null;
+          }
+          setIsListening(false);
+          cleanupRecording();
+          evaluateWithAI(result);
+        }
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      console.log("Speech recognition error:", event.error);
+      if (event.error !== "no-speech" && event.error !== "aborted") {
+        setShowTextInput(true);
+      }
+      setIsListening(false);
+      cleanupRecording();
+    };
+
+    recognition.onend = () => {
+      if (isManual && isStoppingManuallyRef.current && manualTranscriptRef.current) {
+        setIsListening(false);
+        cleanupRecording();
+        evaluateWithAI(manualTranscriptRef.current);
+        manualTranscriptRef.current = "";
+        return;
+      }
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+    // Start recognition directly from user gesture — this is critical for mobile browsers
+    recognition.start();
+    setIsListening(true);
+
+    // Auto-stop timer (only in auto mode)
+    if (!isManual) {
+      autoStopTimerRef.current = setTimeout(() => {
+        try { recognitionRef.current?.stop(); } catch {}
+        cleanupRecording();
+        setIsListening(false);
+        autoStopTimerRef.current = null;
+      }, recordingSettings.autoStopSeconds * 1000);
+    }
+
+    // Start MediaRecorder in background (non-blocking, not needed for gesture)
     navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
       streamRef.current = stream;
-
-      // Set up MediaRecorder for playback recording
       try {
         const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
           : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4'
@@ -269,88 +345,10 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
       } catch {
         // MediaRecorder not critical
       }
-
-      const isManual = recordingSettings.mode === "manual";
-      const recognition = new SpeechRecognition();
-      recognition.lang = "nl-NL";
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 3;
-      recognition.continuous = isManual;
-
-      recognition.onresult = (event: any) => {
-        if (isManual) {
-          // In manual mode, accumulate all final results
-          let fullTranscript = "";
-          for (let i = 0; i < event.results.length; i++) {
-            if (event.results[i].isFinal) {
-              fullTranscript += event.results[i][0].transcript + " ";
-            }
-          }
-          manualTranscriptRef.current = fullTranscript.trim();
-        } else {
-          // In auto mode, immediately submit the first final result
-          const lastResult = event.results[event.results.length - 1];
-          if (lastResult.isFinal) {
-            const result = lastResult[0].transcript;
-            if (autoStopTimerRef.current) {
-              clearTimeout(autoStopTimerRef.current);
-              autoStopTimerRef.current = null;
-            }
-            setIsListening(false);
-            cleanupRecording();
-            evaluateWithAI(result);
-          }
-        }
-      };
-
-      recognition.onerror = (event: any) => {
-        console.log("Speech recognition error:", event.error);
-        if (event.error !== "no-speech" && event.error !== "aborted") {
-          setShowTextInput(true);
-        }
-        setIsListening(false);
-        cleanupRecording();
-      };
-
-      recognition.onend = () => {
-        // In manual mode, submit accumulated transcript when recognition ends
-        if (isManual && isStoppingManuallyRef.current && manualTranscriptRef.current) {
-          setIsListening(false);
-          cleanupRecording();
-          evaluateWithAI(manualTranscriptRef.current);
-          manualTranscriptRef.current = "";
-          return;
-        }
-        setIsListening(false);
-      };
-
-      recognitionRef.current = recognition;
-      recognition.start();
-      setIsListening(true);
-
-      // Auto-stop timer (only in auto mode)
-      if (!isManual) {
-        autoStopTimerRef.current = setTimeout(() => {
-          try { recognitionRef.current?.stop(); } catch {}
-          cleanupRecording();
-          setIsListening(false);
-          autoStopTimerRef.current = null;
-        }, recordingSettings.autoStopSeconds * 1000);
-      }
-    }).catch((err) => {
-      console.error("Microphone access denied:", err);
-      setShowTextInput(true);
+    }).catch(() => {
+      // MediaRecorder failure is non-critical, speech recognition still works
     });
-  }, [evaluateWithAI, recordingSettings]);
-
-  const cleanupRecording = useCallback(() => {
-    try { mediaRecorderRef.current?.stop(); } catch {}
-    mediaRecorderRef.current = null;
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-  }, []);
+  }, [evaluateWithAI, recordingSettings, cleanupRecording]);
 
   const stopListening = useCallback(() => {
     if (autoStopTimerRef.current) {
