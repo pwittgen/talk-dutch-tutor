@@ -21,18 +21,27 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash-image",
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
+        messages: [{ role: "user", content: prompt }],
         modalities: ["image", "text"],
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`AI gateway error: ${response.status}`);
+      const status = response.status;
+      await response.text(); // consume body
+      if (status === 402) {
+        return new Response(
+          JSON.stringify({ error: "credits_exhausted", questionId }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (status === 429) {
+        return new Response(
+          JSON.stringify({ error: "rate_limited", questionId }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      throw new Error(`AI gateway error: ${status}`);
     }
 
     const data = await response.json();
