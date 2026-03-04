@@ -1,39 +1,31 @@
 
 
-## Speed Up Speech Loading
+## Analysis
 
-There are two main strategies to make speech load faster:
+The current `useSpeechRecognition` hook calls `recognition.start()` immediately on button press. On mobile Safari/Chrome, the browser may still be initializing the audio pipeline, leading to silent failures or empty transcripts.
 
-### 1. Switch to ElevenLabs Turbo Model
-The current edge function uses `eleven_multilingual_v2` which is high-quality but slower. ElevenLabs offers `eleven_turbo_v2_5` — a low-latency model that still supports multilingual (including Dutch) and is significantly faster to generate.
+A "readiness gate" — pre-warming the microphone with `getUserMedia` before starting speech recognition — would solve this without a visible waiting period. The user taps the mic, we grab the audio stream (which also triggers the permission prompt if needed), and only then start recognition. This adds ~200-500ms but the user sees the button go into "listening" state, so it feels instant.
 
-**Change in `supabase/functions/elevenlabs-tts/index.ts`:**
-- Replace `model_id: "eleven_multilingual_v2"` with `model_id: "eleven_turbo_v2_5"`
+## Plan
 
-### 2. Use Streaming Instead of Buffered Response
-Currently the edge function waits for the entire audio file to be generated before returning it. By using ElevenLabs' streaming endpoint (`/stream`), audio chunks are sent as they're generated. The client can start playing almost immediately.
+### 1. Add microphone pre-warming to `useSpeechRecognition.ts`
 
-**Edge function changes:**
-- Change URL from `/text-to-speech/{voiceId}` to `/text-to-speech/{voiceId}/stream`
-- Pass through `response.body` (a ReadableStream) directly instead of buffering the whole `arrayBuffer()`
-- Add `Transfer-Encoding: chunked` header
+In `startListening`, before calling `createAndStart()`:
 
-**Client-side changes in `ConversationView.tsx`:**
-- Remove `oncanplaythrough` wait — instead, set the `src` to a blob URL created from the streamed response and let the browser start playing as soon as enough data arrives
-- Use `canplay` event instead of `canplaythrough` for faster start
+- Call `navigator.mediaDevices.getUserMedia({ audio: true })` to acquire the mic stream
+- Store the stream in a new `micStreamRef`
+- Only call `createAndStart()` after the stream is acquired
+- If `getUserMedia` fails (permission denied, no mic), call `onFallbackToText` immediately
+- In `cleanup()`, stop all tracks on `micStreamRef.current` to release the mic hardware
 
-### 3. Preload Next Turn's Audio
-When the current turn is playing, preload the next turn's audio in the background so it's ready instantly.
+### 2. Delay auto-stop timer until first speech detected
 
-**Client-side changes:**
-- Add a `preloadedAudioRef` that fetches the next turn's audio after the current turn starts
-- On turn advance, use the preloaded audio instead of fetching fresh
+- Add a `hasReceivedSpeechRef` flag, set to `true` on first `onresult`
+- Start the auto-stop timer only after first `onresult`, not at the beginning
+- Add a separate 8-second "no speech at all" timeout that triggers text input fallback if nothing is detected
 
-### Summary of Changes
-| File | Change |
-|------|--------|
-| `supabase/functions/elevenlabs-tts/index.ts` | Switch to turbo model + streaming endpoint |
-| `src/components/ConversationView.tsx` | Stream-compatible playback, preload next turn's audio |
+### 3. Show a brief "Preparing mic..." state
 
-This combination should reduce time-to-first-audio from several seconds to under 1 second for most utterances.
+- Add a `isPreparing` state to the hook return value (true between button press and mic acquired)
+- In `ConversationView.tsx` and `ExamSimulation.tsx`, show a subtle loading indicator on the mic button during this brief phase
 
