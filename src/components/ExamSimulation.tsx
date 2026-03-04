@@ -81,11 +81,14 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
       const response = await supabase.functions.invoke("generate-exam-image", {
         body: { prompt: q.imagePrompts[imgIndex], questionId: q.id },
       });
-      if (response.data?.imageUrl) {
+      if (response.error) {
+        // 402/429 come back as FunctionsHttpError — skip silently, show placeholder
+        console.warn("Image generation unavailable:", response.error);
+      } else if (response.data?.imageUrl) {
         setGeneratedImages(prev => ({ ...prev, [key]: response.data.imageUrl }));
       }
     } catch (e) {
-      console.error("Failed to generate image:", e);
+      console.warn("Image generation failed, using placeholder:", e);
     } finally {
       setLoadingImage(null);
     }
