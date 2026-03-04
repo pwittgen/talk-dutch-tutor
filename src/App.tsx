@@ -9,6 +9,7 @@ import ProgressPage from "./pages/ProgressPage";
 import SettingsPage from "./pages/SettingsPage";
 import LearnCategoryPage from "./pages/LearnCategoryPage";
 import ExamPage from "./pages/ExamPage";
+import AdminExamPage from "./pages/AdminExamPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
           <Route path="/scenario/:id" element={<ScenarioPage />} />
           <Route path="/learn/:categoryId" element={<LearnCategoryPage />} />
           <Route path="/exam" element={<ExamPage />} />
+          <Route path="/admin/exam" element={<AdminExamPage />} />
           <Route path="/progress" element={<ProgressPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
