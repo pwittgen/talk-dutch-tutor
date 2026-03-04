@@ -20,13 +20,12 @@ const isSafariBrowser = () => /^((?!chrome|android).)*safari/i.test(navigator.us
 const isMobileDevice = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
 /**
- * Robust speech recognition hook that handles:
- * - Safari's auto-stop behavior (restarts automatically)
- * - Mobile Chrome permission quirks
- * - Accumulates transcript across restarts
- * - Auto-stop timer for "auto" mode
- * - Manual stop for "manual" mode
- * - Graceful fallback to text input
+ * Robust speech recognition hook with:
+ * - getUserMedia pre-warming (fixes mobile Safari/Chrome)
+ * - Delayed auto-stop (waits for first speech before starting timer)
+ * - No-speech timeout fallback
+ * - Safari auto-restart handling
+ * - Accumulated transcript across restarts
  */
 export function useSpeechRecognition({
   scenario,
@@ -37,17 +36,19 @@ export function useSpeechRecognition({
   autoStopSeconds,
 }: UseSpeechRecognitionOptions) {
   const [isListening, setIsListening] = useState(false);
+  const [isPreparing, setIsPreparing] = useState(false);
   const [interimText, setInterimText] = useState("");
 
-  // Refs to survive across closures
   const recognitionRef = useRef<any>(null);
   const accumulatedTranscriptRef = useRef("");
   const isStoppingRef = useRef(false);
   const hasSubmittedRef = useRef(false);
   const autoStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const noSpeechTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restartCountRef = useRef(0);
-  const lastActivityRef = useRef(0);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const hasReceivedSpeechRef = useRef(false);
 
   const isSafari = isSafariBrowser();
   const isMobile = isMobileDevice();
@@ -58,6 +59,13 @@ export function useSpeechRecognition({
   useEffect(() => { onTranscriptRef.current = onTranscript; }, [onTranscript]);
   useEffect(() => { onFallbackRef.current = onFallbackToText; }, [onFallbackToText]);
 
+  const releaseMic = useCallback(() => {
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach(t => t.stop());
+      micStreamRef.current = null;
+    }
+  }, []);
+
   const cleanup = useCallback(() => {
     if (autoStopTimerRef.current) {
       clearTimeout(autoStopTimerRef.current);
@@ -67,11 +75,17 @@ export function useSpeechRecognition({
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
     }
+    if (noSpeechTimerRef.current) {
+      clearTimeout(noSpeechTimerRef.current);
+      noSpeechTimerRef.current = null;
+    }
     try { recognitionRef.current?.abort(); } catch {}
     recognitionRef.current = null;
+    releaseMic();
     setIsListening(false);
+    setIsPreparing(false);
     setInterimText("");
-  }, []);
+  }, [releaseMic]);
 
   const submitFinal = useCallback(() => {
     if (hasSubmittedRef.current) return;
@@ -100,27 +114,25 @@ export function useSpeechRecognition({
     accumulatedTranscriptRef.current = "";
     isStoppingRef.current = false;
     hasSubmittedRef.current = false;
+    hasReceivedSpeechRef.current = false;
     restartCountRef.current = 0;
-    lastActivityRef.current = Date.now();
     setInterimText("");
+    setIsPreparing(true);
 
     logSpeechEvent(scenario, "start-requested", {
       mode, autoStopSeconds, isSafari, isMobile,
     });
 
     const createAndStart = () => {
-      // Don't restart if user already stopped or submitted
       if (isStoppingRef.current || hasSubmittedRef.current) return;
 
       const recognition = new SpeechRecognition();
       recognition.lang = lang;
       recognition.interimResults = true;
       recognition.maxAlternatives = 1;
-      // Safari: continuous=true causes issues. Chrome: works fine.
       recognition.continuous = !isSafari;
 
       recognition.onresult = (event: any) => {
-        lastActivityRef.current = Date.now();
         let sessionFinal = "";
         let interim = "";
 
@@ -133,8 +145,34 @@ export function useSpeechRecognition({
           }
         }
 
+        // First speech received — start auto-stop timer now
+        if (!hasReceivedSpeechRef.current && (sessionFinal.trim() || interim.trim())) {
+          hasReceivedSpeechRef.current = true;
+          logSpeechEvent(scenario, "first-speech-detected", { interim: interim.trim(), final: sessionFinal.trim() });
+
+          // Cancel the no-speech timeout
+          if (noSpeechTimerRef.current) {
+            clearTimeout(noSpeechTimerRef.current);
+            noSpeechTimerRef.current = null;
+          }
+
+          // Start auto-stop timer NOW (only in auto mode)
+          if (mode === "auto") {
+            autoStopTimerRef.current = setTimeout(() => {
+              logSpeechEvent(scenario, "auto-stop-timer-fired", {
+                seconds: autoStopSeconds,
+                accumulated: accumulatedTranscriptRef.current.trim(),
+              });
+              isStoppingRef.current = true;
+              try { recognitionRef.current?.stop(); } catch {}
+              setTimeout(() => {
+                if (!hasSubmittedRef.current) submitFinal();
+              }, 800);
+            }, autoStopSeconds * 1000);
+          }
+        }
+
         if (sessionFinal.trim()) {
-          // Append final results to accumulated transcript
           accumulatedTranscriptRef.current += sessionFinal;
           logSpeechEvent(scenario, "result-final", {
             chunk: sessionFinal.trim(),
@@ -142,13 +180,11 @@ export function useSpeechRecognition({
           });
         }
 
-        // Show interim text for UI feedback
         const display = (accumulatedTranscriptRef.current + interim).trim();
         setInterimText(display);
 
-        // In auto mode on non-Safari, submit after first final result + small delay
+        // In auto mode, reset silence sub-timer on each result
         if (mode === "auto" && sessionFinal.trim() && !isSafari) {
-          // Reset silence timer — submit after 1.5s of no new results
           if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
           silenceTimerRef.current = setTimeout(() => {
             submitFinal();
@@ -167,18 +203,8 @@ export function useSpeechRecognition({
           return;
         }
 
-        if (error === "no-speech") {
-          // Browser timed out waiting for speech — this is normal
-          // onend will fire next and handle restart
-          return;
-        }
+        if (error === "no-speech" || error === "aborted") return;
 
-        if (error === "aborted") {
-          // Usually means we called .stop() or .abort() — normal flow
-          return;
-        }
-
-        // Unknown error — try to submit what we have
         logSpeechEvent(scenario, "unknown-error-submitting", { error });
         submitFinal();
       };
@@ -193,15 +219,11 @@ export function useSpeechRecognition({
 
         if (hasSubmittedRef.current) return;
 
-        // If user requested stop, submit what we have
         if (isStoppingRef.current) {
-          // Short delay to catch any late onresult events
           setTimeout(() => submitFinal(), 200);
           return;
         }
 
-        // Browser auto-stopped (Safari does this often, Chrome after no-speech)
-        // Restart if we haven't exceeded max restarts
         const maxRestarts = isSafari ? 15 : 5;
         if (restartCountRef.current < maxRestarts) {
           restartCountRef.current++;
@@ -210,7 +232,6 @@ export function useSpeechRecognition({
             maxRestarts,
             accumulated: accumulatedTranscriptRef.current.trim(),
           });
-          // Small delay before restart to avoid rapid-fire
           setTimeout(() => createAndStart(), isSafari ? 100 : 50);
         } else {
           logSpeechEvent(scenario, "max-restarts-reached", { maxRestarts });
@@ -228,7 +249,6 @@ export function useSpeechRecognition({
           error: err?.message || String(err),
           restart: restartCountRef.current,
         });
-        // If first start fails, fall back to text
         if (restartCountRef.current === 0) {
           cleanup();
           onFallbackRef.current();
@@ -236,27 +256,38 @@ export function useSpeechRecognition({
       }
     };
 
-    // Start the first recognition session
-    createAndStart();
-    setIsListening(true);
+    // ===== STEP 1: Pre-warm microphone with getUserMedia =====
+    // This must happen in the same user-gesture call stack
+    const warmupMic = async () => {
+      try {
+        logSpeechEvent(scenario, "mic-warmup-start", {});
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        micStreamRef.current = stream;
+        logSpeechEvent(scenario, "mic-warmup-success", {});
 
-    // Auto-stop timer (only in auto mode)
-    if (mode === "auto") {
-      autoStopTimerRef.current = setTimeout(() => {
-        logSpeechEvent(scenario, "auto-stop-timer-fired", {
-          seconds: autoStopSeconds,
-          accumulated: accumulatedTranscriptRef.current.trim(),
-        });
-        isStoppingRef.current = true;
-        try { recognitionRef.current?.stop(); } catch {}
-        // Force submit after grace period
-        setTimeout(() => {
-          if (!hasSubmittedRef.current) {
-            submitFinal();
+        // Mic is ready — now start speech recognition
+        setIsPreparing(false);
+        setIsListening(true);
+        createAndStart();
+
+        // ===== STEP 2: No-speech timeout =====
+        // If nothing is detected within 8 seconds, fall back to text input
+        noSpeechTimerRef.current = setTimeout(() => {
+          if (!hasReceivedSpeechRef.current && !hasSubmittedRef.current && !isStoppingRef.current) {
+            logSpeechEvent(scenario, "no-speech-timeout", { seconds: 8 });
+            cleanup();
+            onFallbackRef.current();
           }
-        }, 800);
-      }, autoStopSeconds * 1000);
-    }
+        }, 8000);
+      } catch (err: any) {
+        logSpeechEvent(scenario, "mic-warmup-failed", { error: err?.message || String(err) });
+        setIsPreparing(false);
+        cleanup();
+        onFallbackRef.current();
+      }
+    };
+
+    warmupMic();
   }, [scenario, lang, mode, autoStopSeconds, isSafari, isMobile, cleanup, submitFinal]);
 
   const stopListening = useCallback(() => {
@@ -272,8 +303,11 @@ export function useSpeechRecognition({
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
     }
+    if (noSpeechTimerRef.current) {
+      clearTimeout(noSpeechTimerRef.current);
+      noSpeechTimerRef.current = null;
+    }
     try { recognitionRef.current?.stop(); } catch {}
-    // Force submit after short delay (onend should handle it, this is a safety net)
     setTimeout(() => {
       if (!hasSubmittedRef.current) {
         submitFinal();
@@ -291,6 +325,7 @@ export function useSpeechRecognition({
 
   return {
     isListening,
+    isPreparing,
     interimText,
     startListening,
     stopListening,

@@ -124,7 +124,7 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
   }, [question, currentIndex, questions.length, opgaveInfo]);
 
   // Hook up speech recognition via the shared hook
-  const { isListening, interimText: examInterimText, startListening, stopListening } = useSpeechRecognition({
+  const { isListening, isPreparing, interimText: examInterimText, startListening, stopListening } = useSpeechRecognition({
     scenario: `Exam Q${currentIndex + 1}`,
     lang: "nl-NL",
     onTranscript: evaluateAnswer,
@@ -377,15 +377,18 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
 
               <div className="flex gap-3">
                 <Button
-                  onClick={isListening ? stopListening : startListening}
+                  onClick={isPreparing ? undefined : isListening ? stopListening : startListening}
+                  disabled={isPreparing}
                   className={`rounded-2xl h-14 px-8 gap-2 text-base font-bold ${
-                    isListening
+                    isPreparing
+                      ? "bg-muted text-muted-foreground"
+                      : isListening
                       ? "bg-destructive text-destructive-foreground animate-pulse"
                       : "bg-gradient-hero text-primary-foreground shadow-primary"
                   }`}
                 >
-                  {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-                  {isListening ? "Stop opname" : "Start opname"}
+                  {isPreparing ? <Loader2 className="h-5 w-5 animate-spin" /> : isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                  {isPreparing ? "Mic voorbereiden..." : isListening ? "Stop opname" : "Start opname"}
                 </Button>
                 {!isListening && (
                   <Button

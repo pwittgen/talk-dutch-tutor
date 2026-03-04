@@ -213,7 +213,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     }
   }, [turn, scenarioTitle, currentTurn, activeTurns.length, openEnded]);
 
-  const { isListening, interimText, startListening, stopListening } = useSpeechRecognition({
+  const { isListening, isPreparing, interimText, startListening, stopListening } = useSpeechRecognition({
     scenario: scenarioTitle,
     lang: "nl-NL",
     onTranscript: evaluateWithAI,
@@ -438,10 +438,13 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
             {/* Microphone button */}
             <div className="flex flex-col items-center gap-4">
               <motion.button
-                onClick={isListening ? stopListening : startListening}
+                onClick={isPreparing ? undefined : isListening ? stopListening : startListening}
                 whileTap={{ scale: 0.95 }}
+                disabled={isPreparing}
                 className={`relative flex h-20 w-20 items-center justify-center rounded-full transition-all duration-200 ${
-                  isListening
+                  isPreparing
+                    ? "bg-muted text-muted-foreground"
+                    : isListening
                     ? "bg-destructive text-destructive-foreground scale-110"
                     : "bg-gradient-hero text-primary-foreground shadow-primary"
                 }`}
@@ -453,14 +456,18 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
                     <span className="absolute inset-[-4px] rounded-full border-2 border-destructive/50 animate-pulse" />
                   </>
                 )}
-                {isListening ? (
+                {isPreparing ? (
+                  <Loader2 className="h-8 w-8 animate-spin relative z-10" />
+                ) : isListening ? (
                   <MicOff className="h-8 w-8 relative z-10" />
                 ) : (
                   <Mic className="h-8 w-8" />
                 )}
               </motion.button>
               <p className="text-sm font-medium text-muted-foreground">
-                {isListening
+                {isPreparing
+                  ? "Preparing mic..."
+                  : isListening
                   ? recordingSettings.mode === "manual"
                     ? "Recording... tap to stop"
                     : `Listening... (${recordingSettings.autoStopSeconds}s)`
