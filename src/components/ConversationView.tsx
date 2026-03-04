@@ -314,12 +314,18 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     };
 
     recognition.onend = () => {
+      // If auto-stop already handled submission, do nothing
+      if (isStoppingManuallyRef.current && !manualTranscriptRef.current) {
+        setIsListening(false);
+        return;
+      }
       // Submit accumulated transcript if we have one
       if (manualTranscriptRef.current) {
+        const transcript = manualTranscriptRef.current;
+        manualTranscriptRef.current = "";
         setIsListening(false);
         cleanupRecording();
-        evaluateWithAI(manualTranscriptRef.current);
-        manualTranscriptRef.current = "";
+        evaluateWithAI(transcript);
         return;
       }
       // If still supposed to be listening (e.g., browser auto-stopped), restart
@@ -339,11 +345,15 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     if (!isManual) {
       autoStopTimerRef.current = setTimeout(() => {
         isStoppingManuallyRef.current = true;
+        const transcript = manualTranscriptRef.current;
         try { recognitionRef.current?.stop(); } catch {}
-        // If no transcript was captured, just clean up
-        if (!manualTranscriptRef.current) {
-          cleanupRecording();
-          setIsListening(false);
+        recognitionRef.current = null;
+        cleanupRecording();
+        setIsListening(false);
+        // Directly submit whatever we captured — don't rely on onend
+        if (transcript) {
+          manualTranscriptRef.current = "";
+          evaluateWithAI(transcript);
         }
         autoStopTimerRef.current = null;
       }, recordingSettings.autoStopSeconds * 1000);
