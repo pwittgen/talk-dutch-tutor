@@ -108,13 +108,17 @@ export function useSpeechRecognition({
     onTranscriptRef.current(transcript);
   }, [scenario, cleanupSession]);
 
-  /** Acquire mic stream if not already held */
+  /** Acquire mic stream — on Safari mobile, always get a fresh stream to re-activate the audio pipeline */
   const ensureMicStream = useCallback(async (): Promise<boolean> => {
-    // Check if existing stream is still active
-    if (micStreamRef.current) {
+    // On Safari mobile, always refresh the stream to wake up the audio hardware
+    // Permission is cached so this won't show a prompt after the first time
+    const needsFreshStream = isSafari && isMobile;
+
+    if (!needsFreshStream && micStreamRef.current) {
       const tracks = micStreamRef.current.getTracks();
       const allLive = tracks.length > 0 && tracks.every(t => t.readyState === "live");
       if (allLive) {
+        logSpeechEvent(scenario, "mic-reused", {});
         return true; // Stream still good
       }
       // Stream died, clean up reference
@@ -122,8 +126,14 @@ export function useSpeechRecognition({
       micAcquiredRef.current = false;
     }
 
+    // Release old stream before acquiring new one
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach(t => t.stop());
+      micStreamRef.current = null;
+    }
+
     try {
-      logSpeechEvent(scenario, "mic-warmup-start", {});
+      logSpeechEvent(scenario, "mic-warmup-start", { fresh: needsFreshStream });
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       micStreamRef.current = stream;
       micAcquiredRef.current = true;
@@ -133,7 +143,7 @@ export function useSpeechRecognition({
       logSpeechEvent(scenario, "mic-warmup-failed", { error: err?.message || String(err) });
       return false;
     }
-  }, [scenario]);
+  }, [scenario, isSafari, isMobile]);
 
   const startListening = useCallback(() => {
     // Pre-flight checks
