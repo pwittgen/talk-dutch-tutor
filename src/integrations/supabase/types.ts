@@ -14,7 +14,108 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      speaking_exam_sessions: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          duration_seconds: number | null
+          id: string
+          question_ids: string[]
+          results: Json
+          session_key: string
+          started_at: string
+          total_score: number | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          question_ids?: string[]
+          results?: Json
+          session_key?: string
+          started_at?: string
+          total_score?: number | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          question_ids?: string[]
+          results?: Json
+          session_key?: string
+          started_at?: string
+          total_score?: number | null
+        }
+        Relationships: []
+      }
+      speaking_question_templates: {
+        Row: {
+          category: Database["public"]["Enums"]["question_category"]
+          created_at: string
+          dutch_question: string
+          english_question: string
+          hints: string[]
+          id: string
+          is_active: boolean
+          keywords: string[]
+          media_urls: string[]
+          opgave: number
+          opgave_type: Database["public"]["Enums"]["opgave_type"]
+          placeholder_descriptions: string[]
+          question_number: number
+          sample_answer: string
+          situation_dutch: string
+          situation_english: string
+          tags: string[]
+          updated_at: string
+          video_description: string | null
+        }
+        Insert: {
+          category?: Database["public"]["Enums"]["question_category"]
+          created_at?: string
+          dutch_question: string
+          english_question: string
+          hints?: string[]
+          id?: string
+          is_active?: boolean
+          keywords?: string[]
+          media_urls?: string[]
+          opgave: number
+          opgave_type: Database["public"]["Enums"]["opgave_type"]
+          placeholder_descriptions?: string[]
+          question_number: number
+          sample_answer?: string
+          situation_dutch: string
+          situation_english: string
+          tags?: string[]
+          updated_at?: string
+          video_description?: string | null
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["question_category"]
+          created_at?: string
+          dutch_question?: string
+          english_question?: string
+          hints?: string[]
+          id?: string
+          is_active?: boolean
+          keywords?: string[]
+          media_urls?: string[]
+          opgave?: number
+          opgave_type?: Database["public"]["Enums"]["opgave_type"]
+          placeholder_descriptions?: string[]
+          question_number?: number
+          sample_answer?: string
+          situation_dutch?: string
+          situation_english?: string
+          tags?: string[]
+          updated_at?: string
+          video_description?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +124,8 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      opgave_type: "video" | "1-photo" | "2-photos" | "3-photos"
+      question_category: "beschrijven" | "mening" | "situatie"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +252,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      opgave_type: ["video", "1-photo", "2-photos", "3-photos"],
+      question_category: ["beschrijven", "mening", "situatie"],
+    },
   },
 } as const

@@ -129,8 +129,8 @@ const ExamPage = () => {
               A2 Spreken Oefenexamen
             </h2>
             <p className="text-muted-foreground max-w-md mx-auto">
-              Oefen het echte DUO A2 Spreken examen. 12 vragen verdeeld over 4 opgaven. 
-              Geef korte, simpele antwoorden — net als bij het echte examen.
+              Oefen het echte DUO A2 Spreken examen. 16 vragen verdeeld over 4 opgaven in 35 minuten. 
+              Alle antwoorden zijn gesproken — net als bij het echte examen.
             </p>
 
             <div className="space-y-3 max-w-md mx-auto text-left">
@@ -148,7 +148,7 @@ const ExamPage = () => {
               </div>
               <div className="rounded-xl bg-card border border-border p-4">
                 <p className="font-display text-sm font-black text-primary">Opgave 4 — 3 plaatjes</p>
-                <p className="text-xs text-muted-foreground">4 vragen bij drie foto's — vertel ook waarom</p>
+                <p className="text-xs text-muted-foreground">4 vragen bij drie foto's — vertel iets over alle drie en waarom</p>
               </div>
             </div>
 
