@@ -12,10 +12,24 @@ serve(async (req) => {
   }
 
   try {
-    const { userAnswer, dutchPrompt, englishHint, scenarioContext, imageDescription, openEnded } = await req.json();
+    const { userAnswer, dutchPrompt, englishHint, scenarioContext, imageDescription, openEnded, sampleAnswer, examMode } = await req.json();
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+    const examModeRules = examMode ? `
+INBURGERING A2 SPREKEN EXAM MODE:
+- This simulates the real DUO A2 speaking exam.
+- REWARD short, simple answers. At A2 level, 1-2 short sentences is PERFECT.
+- Example of a PERFECT A2 answer: "Ik koop brood en melk." or "Ik vind de school goed."
+- Do NOT penalize for being too brief. Short = good at A2 level.
+- The correctedDutch should be a SHORT improved version of what the user actually said, NOT a long complex answer.
+- If their answer was already good, the correctedDutch can be very similar to what they said.
+- Compare against the sample answer for style/length: "${sampleAnswer || ''}"
+- Encourage the student to answer the question directly rather than giving long descriptions.
+- Grade "perfect" for grammatically correct short answers that address the question.
+- Grade "good" for understandable answers with minor errors.
+- A 1-sentence answer that's correct = 5 stars.` : '';
 
     const openEndedRules = openEnded ? `
 OPEN-ENDED SCENARIO RULES:
@@ -28,35 +42,37 @@ OPEN-ENDED SCENARIO RULES:
 - Grade "needs_improvement" if the idea is fine but grammar needs work.
 - Be very encouraging — creativity and self-expression matter here!` : '';
 
-    const systemPrompt = `You are a friendly Dutch language tutor for A1-A2 level English-speaking students. 
-You evaluate student responses in Dutch conversations. Be encouraging but accurate.
+    const systemPrompt = `You are a friendly Dutch language tutor evaluating A2-level speaking exam answers.
+${examModeRules}
 ${openEndedRules}
 
 IMPORTANT RULES:
-- Accept ANY response that is contextually appropriate for the situation, not just exact phrases
-- Focus on whether the student communicated the right meaning, even if phrasing differs
-- Evaluate grammar, vocabulary, and pronunciation patterns
-- If they used speech recognition, note common Dutch pronunciation mistakes English speakers make
-- Always provide the "ideal" response as a learning reference${openEnded ? ' (suggest what would be a natural reply)' : ''}
-- Grade on a scale: "perfect", "good", "needs_improvement", "incorrect"
-- "perfect" = grammatically correct and contextually appropriate
-- "good" = understandable and mostly correct, minor issues
-- "needs_improvement" = right idea but significant grammar/vocab errors
-- "incorrect" = wrong meaning or completely off-topic${openEnded ? ' or inappropriate/offensive content' : ''}`;
+- Accept ANY response that is contextually appropriate for the situation
+- Focus on whether the student communicated the right meaning
+- At A2 level, simple grammar and basic vocabulary is expected and should be rewarded
+- SHORT answers are BETTER than long complex ones for A2
+- The correctedDutch field should be an improved version of THE USER'S OWN answer — keep it short and at A2 level
+- Do NOT rewrite their answer into something completely different
+- If they used speech recognition, be forgiving of transcription errors
+- Always provide encouraging feedback in English (1-2 sentences max)
+- Grade: "perfect" = correct and addresses the question, "good" = understandable with minor issues, "needs_improvement" = right idea but errors, "incorrect" = off-topic or inappropriate`;
 
     let userPrompt = `SCENARIO CONTEXT: ${scenarioContext}
 
-THE DUTCH SPEAKER SAID: "${dutchPrompt}"
+THE QUESTION ASKED: "${dutchPrompt}"
 EXPECTED INTENT: ${englishHint}`;
 
     if (imageDescription) {
-      userPrompt += `\nIMAGE SHOWN TO STUDENT: ${imageDescription}
-The student should incorporate describing or referencing what they see in the image in their response.`;
+      userPrompt += `\nIMAGE SHOWN: ${imageDescription}`;
     }
 
-    userPrompt += `\n\nSTUDENT'S RESPONSE: "${userAnswer}"
+    if (sampleAnswer) {
+      userPrompt += `\nSAMPLE ANSWER (for reference, short A2 style): "${sampleAnswer}"`;
+    }
 
-Evaluate this response. Return your evaluation using the evaluate_response function.`;
+    userPrompt += `\n\nSTUDENT'S ANSWER: "${userAnswer}"
+
+Evaluate this response. The correctedDutch should be a short, improved version of what the student actually said (keep it A2 level, 1-2 sentences max).`;
 
     const response = await fetch(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
@@ -87,35 +103,34 @@ Evaluate this response. Return your evaluation using the evaluate_response funct
                     },
                     feedback: {
                       type: "string",
-                      description: "Encouraging feedback message in English (1-2 sentences)",
+                      description: "Short encouraging feedback in English (1-2 sentences). For A2 exam mode, praise short direct answers.",
                     },
                     correctedDutch: {
                       type: "string",
-                      description: "The ideal/corrected Dutch response",
+                      description: "A short improved version of what the student actually said, at A2 level. Keep it 1-2 sentences max.",
                     },
                     grammarNotes: {
                       type: "array",
                       items: { type: "string" },
-                      description: "Specific grammar corrections or tips (max 3)",
+                      description: "Specific grammar corrections or tips (max 2)",
                     },
                     pronunciationTips: {
                       type: "array",
                       items: { type: "string" },
-                      description: "Dutch pronunciation tips for English speakers relevant to words they used (max 2)",
+                      description: "Dutch pronunciation tips (max 1)",
                     },
                     vocabularyNotes: {
                       type: "array",
                       items: { type: "string" },
-                      description: "Vocabulary suggestions or alternatives (max 2)",
+                      description: "Vocabulary suggestions (max 1)",
                     },
                     cefrLevel: {
                       type: "string",
                       enum: ["A1", "A2", "B1", "B2", "C1", "C2"],
-                      description: "The CEFR level this response corresponds to based on vocabulary, grammar complexity, and fluency",
                     },
                     starRating: {
                       type: "number",
-                      description: "Star rating from 1 to 5 for overall correctness (1=very poor, 2=poor, 3=okay, 4=good, 5=excellent)",
+                      description: "Star rating 1-5. For A2 exam: a correct 1-sentence answer = 5 stars.",
                     },
                   },
                   required: ["grade", "feedback", "correctedDutch", "grammarNotes", "cefrLevel", "starRating"],
@@ -152,7 +167,7 @@ Evaluate this response. Return your evaluation using the evaluate_response funct
 
     const data = await response.json();
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    
+
     if (!toolCall) {
       throw new Error("No evaluation returned from AI");
     }
