@@ -124,7 +124,7 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
   }, [question, currentIndex, questions.length, opgaveInfo]);
 
   // Hook up speech recognition via the shared hook
-  const { isListening, isPreparing, interimText: examInterimText, startListening, stopListening } = useSpeechRecognition({
+  const { isListening, isPreparing, interimText: examInterimText, startListening, stopListening, cancelListening } = useSpeechRecognition({
     scenario: `Exam Q${currentIndex + 1}`,
     lang: "nl-NL",
     onTranscript: evaluateAnswer,

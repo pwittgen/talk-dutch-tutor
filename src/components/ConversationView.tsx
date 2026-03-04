@@ -213,7 +213,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     }
   }, [turn, scenarioTitle, currentTurn, activeTurns.length, openEnded]);
 
-  const { isListening, isPreparing, interimText, startListening, stopListening } = useSpeechRecognition({
+  const { isListening, isPreparing, interimText, startListening, stopListening, cancelListening } = useSpeechRecognition({
     scenario: scenarioTitle,
     lang: "nl-NL",
     onTranscript: evaluateWithAI,
@@ -279,6 +279,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
   }, [currentTurn, turn, openEnded]);
 
   const handleNext = async () => {
+    cancelListening(); // Stop any active recording without submitting
     setFeedback(null);
     setShowAnalysis(false);
     if (currentTurn + 1 >= activeTurns.length) {

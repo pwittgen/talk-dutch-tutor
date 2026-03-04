@@ -343,6 +343,14 @@ export function useSpeechRecognition({
     }, 600);
   }, [scenario, submitFinal]);
 
+  /** Cancel any active listening without submitting — used when advancing turns */
+  const cancelListening = useCallback(() => {
+    logSpeechEvent(scenario, "cancel-requested", {});
+    isStoppingRef.current = true;
+    hasSubmittedRef.current = true; // Prevent submitFinal from firing
+    cleanupSession();
+  }, [scenario, cleanupSession]);
+
   // Cleanup on unmount — this is where we release the mic
   useEffect(() => {
     return () => {
@@ -358,5 +366,6 @@ export function useSpeechRecognition({
     interimText,
     startListening,
     stopListening,
+    cancelListening,
   };
 }
