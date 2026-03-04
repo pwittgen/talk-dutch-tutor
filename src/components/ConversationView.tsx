@@ -58,6 +58,9 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const autoStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const manualTranscriptRef = useRef<string>("");
+  const isStoppingManuallyRef = useRef(false);
+  const streamRef = useRef<MediaStream | null>(null);
   const { settings: recordingSettings } = useRecordingSettings();
 
   const activeTurns = openEnded ? dynamicTurns : turns;
@@ -149,6 +152,18 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     }
   }, [turn, speechRate, muted, fetchTtsBlob, preloadNextTurn]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (autoStopTimerRef.current) clearTimeout(autoStopTimerRef.current);
+      try { recognitionRef.current?.stop(); } catch {}
+      try { mediaRecorderRef.current?.stop(); } catch {}
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+      }
+    };
+  }, []);
+
   // Auto-play dialogue when turn changes
   useEffect(() => {
     if (!muted && turn) {
@@ -223,6 +238,8 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
       clearTimeout(autoStopTimerRef.current);
       autoStopTimerRef.current = null;
     }
+    manualTranscriptRef.current = "";
+    isStoppingManuallyRef.current = false;
 
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -230,12 +247,13 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
       return;
     }
 
-    // Request mic permission first, then start recognition
     navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-      // Set up MediaRecorder for playback
+      streamRef.current = stream;
+
+      // Set up MediaRecorder for playback recording
       try {
-        const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' 
-          : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' 
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
+          : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4'
           : '';
         const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
         audioChunksRef.current = [];
@@ -245,53 +263,64 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
         mediaRecorder.onstop = () => {
           const blob = new Blob(audioChunksRef.current, { type: mimeType || "audio/webm" });
           setRecordedAudioUrl(URL.createObjectURL(blob));
-          stream.getTracks().forEach((t) => t.stop());
         };
-        mediaRecorder.start(100); // Collect data in 100ms chunks for mobile compatibility
+        mediaRecorder.start(100);
         mediaRecorderRef.current = mediaRecorder;
       } catch {
-        // MediaRecorder not critical, continue with speech recognition
+        // MediaRecorder not critical
       }
 
-      // Set up SpeechRecognition
+      const isManual = recordingSettings.mode === "manual";
       const recognition = new SpeechRecognition();
       recognition.lang = "nl-NL";
       recognition.interimResults = false;
       recognition.maxAlternatives = 3;
-      recognition.continuous = recordingSettings.mode === "manual"; // Keep listening in manual mode
+      recognition.continuous = isManual;
 
       recognition.onresult = (event: any) => {
-        // Get the last result for continuous mode
-        const lastResult = event.results[event.results.length - 1];
-        if (lastResult.isFinal) {
-          const result = lastResult[0].transcript;
-          if (autoStopTimerRef.current) {
-            clearTimeout(autoStopTimerRef.current);
-            autoStopTimerRef.current = null;
+        if (isManual) {
+          // In manual mode, accumulate all final results
+          let fullTranscript = "";
+          for (let i = 0; i < event.results.length; i++) {
+            if (event.results[i].isFinal) {
+              fullTranscript += event.results[i][0].transcript + " ";
+            }
           }
-          setIsListening(false);
-          try { mediaRecorderRef.current?.stop(); } catch {}
-          recognitionRef.current = null;
-          evaluateWithAI(result);
+          manualTranscriptRef.current = fullTranscript.trim();
+        } else {
+          // In auto mode, immediately submit the first final result
+          const lastResult = event.results[event.results.length - 1];
+          if (lastResult.isFinal) {
+            const result = lastResult[0].transcript;
+            if (autoStopTimerRef.current) {
+              clearTimeout(autoStopTimerRef.current);
+              autoStopTimerRef.current = null;
+            }
+            setIsListening(false);
+            cleanupRecording();
+            evaluateWithAI(result);
+          }
         }
       };
 
       recognition.onerror = (event: any) => {
         console.log("Speech recognition error:", event.error);
-        // On mobile, "no-speech" is common - don't show text input for it
-        if (event.error === "no-speech" || event.error === "aborted") {
-          setIsListening(false);
-          try { mediaRecorderRef.current?.stop(); } catch {}
-        } else {
-          setIsListening(false);
-          try { mediaRecorderRef.current?.stop(); } catch {}
+        if (event.error !== "no-speech" && event.error !== "aborted") {
           setShowTextInput(true);
         }
+        setIsListening(false);
+        cleanupRecording();
       };
 
       recognition.onend = () => {
-        // On iOS/Safari, recognition can end prematurely
-        // Only update state if we haven't already processed a result
+        // In manual mode, submit accumulated transcript when recognition ends
+        if (isManual && isStoppingManuallyRef.current && manualTranscriptRef.current) {
+          setIsListening(false);
+          cleanupRecording();
+          evaluateWithAI(manualTranscriptRef.current);
+          manualTranscriptRef.current = "";
+          return;
+        }
         setIsListening(false);
       };
 
@@ -299,11 +328,11 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
       recognition.start();
       setIsListening(true);
 
-      // Auto-stop timer
-      if (recordingSettings.mode === "auto") {
+      // Auto-stop timer (only in auto mode)
+      if (!isManual) {
         autoStopTimerRef.current = setTimeout(() => {
           try { recognitionRef.current?.stop(); } catch {}
-          try { mediaRecorderRef.current?.stop(); } catch {}
+          cleanupRecording();
           setIsListening(false);
           autoStopTimerRef.current = null;
         }, recordingSettings.autoStopSeconds * 1000);
@@ -314,15 +343,28 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     });
   }, [evaluateWithAI, recordingSettings]);
 
+  const cleanupRecording = useCallback(() => {
+    try { mediaRecorderRef.current?.stop(); } catch {}
+    mediaRecorderRef.current = null;
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+  }, []);
+
   const stopListening = useCallback(() => {
     if (autoStopTimerRef.current) {
       clearTimeout(autoStopTimerRef.current);
       autoStopTimerRef.current = null;
     }
+    isStoppingManuallyRef.current = true;
     try { recognitionRef.current?.stop(); } catch {}
-    try { mediaRecorderRef.current?.stop(); } catch {}
-    setIsListening(false);
-  }, []);
+    // Don't cleanup recording here - let onend handle it for manual mode
+    if (recordingSettings.mode !== "manual") {
+      cleanupRecording();
+      setIsListening(false);
+    }
+  }, [cleanupRecording, recordingSettings.mode]);
 
   const handleTextSubmit = () => {
     if (textInput.trim()) {
