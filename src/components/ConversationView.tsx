@@ -7,6 +7,7 @@ import { Slider } from "@/components/ui/slider";
 import { type ConversationTurn } from "@/data/scenarios";
 import { supabase } from "@/integrations/supabase/client";
 import { useRecordingSettings } from "@/hooks/useRecordingSettings";
+import { logSpeechEvent } from "@/lib/speechDebugLog";
 
 interface ConversationViewProps {
   turns: ConversationTurn[];
@@ -250,8 +251,10 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     manualTranscriptRef.current = "";
     isStoppingManuallyRef.current = false;
 
+    const scenarioCtx = scenarioTitle;
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
+      logSpeechEvent(scenarioCtx, "no-speech-api", { message: "SpeechRecognition not available" });
       setShowTextInput(true);
       return;
     }
@@ -266,12 +269,25 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     // Safari doesn't handle continuous well — disable it there
     recognition.continuous = !isSafari;
 
+    logSpeechEvent(scenarioCtx, "record-button-clicked", {
+      mode: isManual ? "manual" : "auto",
+      isSafari,
+      continuous: !isSafari,
+      autoStopSeconds: recordingSettings.autoStopSeconds,
+      turnIndex: currentTurn,
+      turnDutch: turn?.dutchText?.substring(0, 80),
+    });
+
     let hasSubmitted = false;
     const submitTranscript = (source: string) => {
       if (hasSubmitted) return;
       const transcript = manualTranscriptRef.current;
-      if (!transcript) return;
+      if (!transcript) {
+        logSpeechEvent(scenarioCtx, "submit-skipped-empty", { source });
+        return;
+      }
       hasSubmitted = true;
+      logSpeechEvent(scenarioCtx, "submit-transcript", { source, transcript });
       console.log(`[Speech] Submitting from ${source}: "${transcript}"`);
       manualTranscriptRef.current = "";
       if (autoStopTimerRef.current) {
@@ -296,6 +312,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
         }
       }
       const bestTranscript = (finalTranscript.trim() || interimTranscript.trim());
+      logSpeechEvent(scenarioCtx, "onresult", { final: finalTranscript.trim(), interim: interimTranscript.trim(), best: bestTranscript });
       console.log(`[Speech] onresult — final: "${finalTranscript.trim()}", interim: "${interimTranscript.trim()}", best: "${bestTranscript}"`);
       manualTranscriptRef.current = bestTranscript;
 
@@ -306,6 +323,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     };
 
     recognition.onerror = (event: any) => {
+      logSpeechEvent(scenarioCtx, "onerror", { error: event.error, message: event.message });
       console.log("[Speech] onerror:", event.error);
       if (event.error === "no-speech" || event.error === "aborted") {
         submitTranscript("onerror");
@@ -314,6 +332,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
           cleanupRecording();
         }
       } else {
+        logSpeechEvent(scenarioCtx, "error-fallback-textinput", { error: event.error });
         setShowTextInput(true);
         setIsListening(false);
         cleanupRecording();
@@ -321,6 +340,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     };
 
     recognition.onend = () => {
+      logSpeechEvent(scenarioCtx, "onend", { hasSubmitted, transcript: manualTranscriptRef.current, isStoppingManually: isStoppingManuallyRef.current });
       console.log(`[Speech] onend — hasSubmitted: ${hasSubmitted}, transcript: "${manualTranscriptRef.current}"`);
       if (hasSubmitted) return;
 
@@ -334,17 +354,25 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
         }
         // If still supposed to be listening (manual mode, browser auto-stopped), restart
         if (!isStoppingManuallyRef.current && isManual && recognitionRef.current) {
+          logSpeechEvent(scenarioCtx, "restart-after-autoend", { mode: "manual" });
           try { recognition.start(); } catch {}
           return;
         }
+        logSpeechEvent(scenarioCtx, "ended-no-transcript", { isStoppingManually: isStoppingManuallyRef.current });
         setIsListening(false);
       }, 300); // 300ms grace period for Safari
     };
 
     recognitionRef.current = recognition;
-    recognition.start();
-    setIsListening(true);
-    console.log(`[Speech] Started — mode: ${isManual ? "manual" : "auto"}, safari: ${isSafari}, continuous: ${!isSafari}`);
+    try {
+      recognition.start();
+      setIsListening(true);
+      logSpeechEvent(scenarioCtx, "recognition-started", { mode: isManual ? "manual" : "auto", isSafari, continuous: !isSafari });
+      console.log(`[Speech] Started — mode: ${isManual ? "manual" : "auto"}, safari: ${isSafari}, continuous: ${!isSafari}`);
+    } catch (err: any) {
+      logSpeechEvent(scenarioCtx, "start-failed", { error: err?.message || String(err) });
+      setShowTextInput(true);
+    }
 
     // Auto-stop timer (only in auto mode)
     if (!isManual) {
