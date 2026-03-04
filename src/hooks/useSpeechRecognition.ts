@@ -161,10 +161,9 @@ export function useSpeechRecognition({
     hasReceivedSpeechRef.current = false;
     restartCountRef.current = 0;
     setInterimText("");
-    setIsPreparing(true);
 
     logSpeechEvent(scenario, "start-requested", {
-      mode, autoStopSeconds, isSafari, isMobile,
+      mode, autoStopSeconds, isSafari, isMobile, micAcquired: micAcquiredRef.current,
     });
 
     const createAndStart = () => {
@@ -300,22 +299,7 @@ export function useSpeechRecognition({
       }
     };
 
-    // ===== Acquire mic (reuses existing stream if alive) =====
-    const warmupAndStart = async () => {
-      const micReady = await ensureMicStream();
-      if (!micReady) {
-        setIsPreparing(false);
-        cleanupSession();
-        onFallbackRef.current();
-        return;
-      }
-
-      // Mic is ready — now start speech recognition
-      setIsPreparing(false);
-      setIsListening(true);
-      createAndStart();
-
-      // No-speech timeout: if nothing detected in 8s, fall back to text
+    const startNoSpeechTimer = () => {
       noSpeechTimerRef.current = setTimeout(() => {
         if (!hasReceivedSpeechRef.current && !hasSubmittedRef.current && !isStoppingRef.current) {
           logSpeechEvent(scenario, "no-speech-timeout", { seconds: 8 });
@@ -325,7 +309,37 @@ export function useSpeechRecognition({
       }, 8000);
     };
 
-    warmupAndStart();
+    // ===== KEY FIX: Preserve gesture context on subsequent calls =====
+    if (micAcquiredRef.current) {
+      // Mic permission already acquired — start recognition SYNCHRONOUSLY
+      // to preserve the user gesture context (critical for mobile Safari)
+      logSpeechEvent(scenario, "sync-start", { reason: "mic-already-acquired" });
+      setIsListening(true);
+      createAndStart();
+      startNoSpeechTimer();
+
+      // Refresh mic stream in background (fire-and-forget) for Safari
+      if (isSafari && isMobile) {
+        ensureMicStream().catch(() => {});
+      }
+    } else {
+      // First time — must await getUserMedia (user expects brief delay)
+      setIsPreparing(true);
+      const warmupAndStart = async () => {
+        const micReady = await ensureMicStream();
+        if (!micReady) {
+          setIsPreparing(false);
+          cleanupSession();
+          onFallbackRef.current();
+          return;
+        }
+        setIsPreparing(false);
+        setIsListening(true);
+        createAndStart();
+        startNoSpeechTimer();
+      };
+      warmupAndStart();
+    }
   }, [scenario, lang, mode, autoStopSeconds, isSafari, isMobile, cleanupSession, submitFinal, ensureMicStream]);
 
   const stopListening = useCallback(() => {
