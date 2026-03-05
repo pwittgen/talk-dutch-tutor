@@ -2,10 +2,11 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, BookOpen, Puzzle, Trophy } from "lucide-react";
-import { vocabCategories } from "@/data/vocabData";
+import { useVocabThemes, useVocabWords } from "@/hooks/useVocabThemes";
 import FlashcardDeck from "@/components/FlashcardDeck";
 import MatchingGame from "@/components/MatchingGame";
 import { Button } from "@/components/ui/button";
+import type { VocabWord } from "@/data/vocabData";
 
 type Mode = "choose" | "flashcards" | "matching" | "complete";
 
@@ -14,7 +15,20 @@ const LearnCategoryPage = () => {
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>("choose");
 
-  const category = vocabCategories.find((c) => c.id === categoryId);
+  const { data: themes = [] } = useVocabThemes();
+  const { data: dbWords = [], isLoading } = useVocabWords(categoryId);
+  const category = themes.find((t) => t.id === categoryId);
+
+  // Map DB words to VocabWord format for existing components
+  const words: VocabWord[] = dbWords.map((w) => ({
+    dutch: w.dutch,
+    english: w.english,
+    example: w.example_sentence || undefined,
+  }));
+
+  if (isLoading) {
+    return <div className="flex min-h-screen items-center justify-center"><p className="text-muted-foreground">Loading...</p></div>;
+  }
 
   if (!category) {
     return (
@@ -39,7 +53,7 @@ const LearnCategoryPage = () => {
             Goed gedaan! 🎉
           </h1>
           <p className="mt-2 text-lg text-muted-foreground">
-            You completed <strong>{category.title}</strong>!
+            You completed <strong>{category.name}</strong>!
           </p>
           <div className="mt-8 flex flex-col gap-3">
             <Button onClick={() => setMode("choose")} className="rounded-xl bg-gradient-hero text-primary-foreground shadow-primary">
@@ -56,7 +70,6 @@ const LearnCategoryPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <div className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
           <button
@@ -67,62 +80,44 @@ const LearnCategoryPage = () => {
           </button>
           <div className="flex-1">
             <h1 className="font-display text-lg font-bold text-foreground">
-              {category.emoji} {category.title}
+              {category.emoji} {category.name}
             </h1>
-            <p className="text-sm text-secondary font-medium italic">{category.dutchTitle}</p>
+            <p className="text-sm text-secondary font-medium italic">{category.dutch_name}</p>
           </div>
         </div>
       </div>
 
       <div className="mx-auto max-w-2xl px-4 py-8">
         {mode === "choose" ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-4"
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
             <p className="text-muted-foreground text-center mb-6">
-              Choose how you want to learn these {category.words.length} words:
+              Choose how you want to learn these {words.length} words:
             </p>
-            <button
-              onClick={() => setMode("flashcards")}
-              className="w-full rounded-2xl bg-card border border-border p-6 text-left shadow-card hover:shadow-card-hover transition-shadow flex items-center gap-4"
-            >
+            <button onClick={() => setMode("flashcards")}
+              className="w-full rounded-2xl bg-card border border-border p-6 text-left shadow-card hover:shadow-card-hover transition-shadow flex items-center gap-4">
               <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10">
                 <BookOpen className="h-7 w-7 text-primary" />
               </div>
               <div>
                 <h3 className="font-display text-lg font-bold text-foreground">Flashcards</h3>
-                <p className="text-sm text-muted-foreground">
-                  Flip cards to learn Dutch ↔ English translations
-                </p>
+                <p className="text-sm text-muted-foreground">Flip cards to learn Dutch ↔ English translations</p>
               </div>
             </button>
-            <button
-              onClick={() => setMode("matching")}
-              className="w-full rounded-2xl bg-card border border-border p-6 text-left shadow-card hover:shadow-card-hover transition-shadow flex items-center gap-4"
-            >
+            <button onClick={() => setMode("matching")}
+              className="w-full rounded-2xl bg-card border border-border p-6 text-left shadow-card hover:shadow-card-hover transition-shadow flex items-center gap-4">
               <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-secondary/10">
                 <Puzzle className="h-7 w-7 text-secondary" />
               </div>
               <div>
                 <h3 className="font-display text-lg font-bold text-foreground">Matching Game</h3>
-                <p className="text-sm text-muted-foreground">
-                  Match Dutch words with their English meanings
-                </p>
+                <p className="text-sm text-muted-foreground">Match Dutch words with their English meanings</p>
               </div>
             </button>
           </motion.div>
         ) : mode === "flashcards" ? (
-          <FlashcardDeck
-            words={category.words}
-            onComplete={() => setMode("complete")}
-          />
+          <FlashcardDeck words={words} onComplete={() => setMode("complete")} />
         ) : mode === "matching" ? (
-          <MatchingGame
-            words={category.words}
-            onComplete={() => setMode("complete")}
-          />
+          <MatchingGame words={words} onComplete={() => setMode("complete")} />
         ) : null}
       </div>
     </div>
