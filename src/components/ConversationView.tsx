@@ -95,7 +95,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     }
   }, [currentTurn, activeTurns, fetchTtsBlob]);
 
-  const speakDutch = useCallback(async (text?: string) => {
+  const speakDutch = useCallback((text?: string) => {
     if (muted) return;
     if (currentAudioRef.current) {
       currentAudioRef.current.pause();
@@ -103,46 +103,54 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     }
     const spokenText = text || turn.dutchText;
     setIsSpeaking(true);
-    try {
-      // Use preloaded audio if available for this text
-      let audioUrl: string;
-      if (preloadedAudioRef.current?.text === spokenText) {
-        audioUrl = preloadedAudioRef.current.blobUrl;
-        preloadedAudioRef.current = null;
-      } else {
-        audioUrl = await fetchTtsBlob(spokenText);
-      }
 
-      const audio = new Audio();
-      currentAudioRef.current = audio;
-      audio.onended = () => {
-        setIsSpeaking(false);
-        URL.revokeObjectURL(audioUrl);
-        currentAudioRef.current = null;
-      };
-      audio.preload = "auto";
-      audio.src = audioUrl;
-      await new Promise<void>((resolve, reject) => {
-        audio.oncanplay = () => resolve();
-        audio.onerror = () => reject(new Error("Audio load failed"));
-      });
-      await audio.play();
-      // Start preloading next turn's audio in background
-      preloadNextTurn();
-    } catch (e) {
-      console.error("ElevenLabs TTS failed, falling back to browser speech:", e);
+    const fallbackToSpeechSynthesis = () => {
       setIsSpeaking(false);
       const utterance = new SpeechSynthesisUtterance(spokenText);
       utterance.lang = "nl-NL";
       utterance.rate = speechRate;
       utterance.pitch = 1.0;
       const voices = speechSynthesis.getVoices();
-      const dutchVoice = voices.find(
-        (v) => v.lang.startsWith("nl") && v.name.toLowerCase().includes("female")
-      ) || voices.find((v) => v.lang.startsWith("nl"));
+      const dutchVoice =
+        voices.find((v) => v.lang.startsWith("nl") && v.name.toLowerCase().includes("female")) ||
+        voices.find((v) => v.lang.startsWith("nl"));
       if (dutchVoice) utterance.voice = dutchVoice;
       speechSynthesis.speak(utterance);
+    };
+
+    const playAudioUrl = (audioUrl: string) => {
+      // Create Audio with src set immediately so play() can be called synchronously
+      const audio = new Audio(audioUrl);
+      currentAudioRef.current = audio;
+      audio.onended = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+        currentAudioRef.current = null;
+        preloadNextTurn();
+      };
+      // play() called synchronously — critical for iOS Safari gesture context preservation
+      audio.play().catch((e) => {
+        console.error("ElevenLabs TTS failed, falling back to browser speech:", e);
+        currentAudioRef.current = null;
+        fallbackToSpeechSynthesis();
+      });
+    };
+
+    // Use preloaded audio if available — play synchronously (critical for iOS Safari)
+    if (preloadedAudioRef.current?.text === spokenText) {
+      const { blobUrl } = preloadedAudioRef.current;
+      preloadedAudioRef.current = null;
+      playAudioUrl(blobUrl);
+      return;
     }
+
+    // Not preloaded — fetch async then play (gesture context may be lost on iOS Safari)
+    fetchTtsBlob(spokenText)
+      .then((audioUrl) => playAudioUrl(audioUrl))
+      .catch((e) => {
+        console.error("ElevenLabs TTS failed, falling back to browser speech:", e);
+        fallbackToSpeechSynthesis();
+      });
   }, [turn, speechRate, muted, fetchTtsBlob, preloadNextTurn]);
 
   // Auto-play dialogue only on initial mount (first turn)
