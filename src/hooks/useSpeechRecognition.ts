@@ -298,8 +298,19 @@ export function useSpeechRecognition({
       // NOTE: Do NOT call ensureMicStream() concurrently here.
       // On iOS, calling getUserMedia while SpeechRecognition is already active can conflict
       // with the microphone hardware and cause recognition to silently stop capturing audio.
+    } else if (isMicReady) {
+      // Mic permission was previously granted but the MediaStream tracks died
+      // (common on iOS when TTS audio reclaims the audio session between turns).
+      // Since permission is already granted, start recognition SYNCHRONOUSLY to
+      // preserve iOS gesture context — SpeechRecognition will re-acquire the mic internally.
+      // Re-acquire the MicContext stream in the background to restore health state.
+      logSpeechEvent(scenario, "sync-start", { reason: "mic-permission-granted-stream-dead" });
+      setIsListening(true);
+      createAndStart();
+      startNoSpeechTimer();
+      ensureMicStream().catch(() => {});
     } else {
-      // First time — must await getUserMedia
+      // First time — must await getUserMedia (permission dialog may appear)
       setIsPreparing(true);
       const warmupAndStart = async () => {
         const micReady = await ensureMicStream();
