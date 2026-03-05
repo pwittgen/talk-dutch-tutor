@@ -11,6 +11,7 @@ import ProgressPage from "./pages/ProgressPage";
 import SettingsPage from "./pages/SettingsPage";
 import LearnCategoryPage from "./pages/LearnCategoryPage";
 import ExamPage from "./pages/ExamPage";
+import ExamHubPage from "./pages/ExamHubPage";
 import AdminExamPage from "./pages/AdminExamPage";
 import AdminVocabPage from "./pages/AdminVocabPage";
 import AuthPage from "./pages/AuthPage";
@@ -33,6 +34,7 @@ const App = () => (
               <Route path="/scenario/:id" element={<ScenarioPage />} />
               <Route path="/learn/:categoryId" element={<LearnCategoryPage />} />
               <Route path="/exam" element={<ExamPage />} />
+              <Route path="/exam-hub" element={<ExamHubPage />} />
               <Route path="/admin/exam" element={<AdminExamPage />} />
               <Route path="/admin/vocab" element={<AdminVocabPage />} />
               <Route path="/debug-logs" element={<DebugLogsPage />} />

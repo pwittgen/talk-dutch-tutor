@@ -172,44 +172,46 @@ const Index = () => {
           >
             <div className="mb-8">
               <h2 className="font-display text-2xl font-black text-foreground">
-                🎓 Inburgering Speaking Exam
+                🎓 Inburgering A2 Examen
               </h2>
               <p className="mt-1 text-muted-foreground">
-                Practice the real exam format with photo-based speaking questions
+                Oefen alle onderdelen van het inburgeringsexamen
               </p>
             </div>
 
             <div className="rounded-2xl bg-card border border-border p-8 shadow-card space-y-6">
-              <div className="text-5xl">📸</div>
+              <div className="text-5xl">📝</div>
               <h3 className="font-display text-xl font-bold text-foreground">
-                Photo-Based Speaking Test
+                4 Examencategorieën
               </h3>
               <p className="text-muted-foreground text-sm max-w-md mx-auto">
-                Just like the real inburgering exam: look at 12 photos, listen to the questions, 
-                and answer in Dutch. No dialogue — pure speaking practice.
+                Oefen Lezen, Spreken, Luisteren en Schrijven — net als bij het echte DUO A2 examen.
               </p>
               
-              <div className="grid grid-cols-3 gap-3 max-w-xs mx-auto">
+              <div className="grid grid-cols-4 gap-3 max-w-sm mx-auto">
                 <div className="rounded-xl bg-muted p-3">
-                  <p className="font-display text-xl font-black text-primary">12</p>
-                  <p className="text-xs text-muted-foreground">Questions</p>
+                  <p className="text-xl">📖</p>
+                  <p className="text-xs text-muted-foreground font-bold">Lezen</p>
                 </div>
                 <div className="rounded-xl bg-muted p-3">
-                  <p className="font-display text-xl font-black text-secondary">A2</p>
-                  <p className="text-xs text-muted-foreground">Level</p>
+                  <p className="text-xl">🗣️</p>
+                  <p className="text-xs text-muted-foreground font-bold">Spreken</p>
                 </div>
                 <div className="rounded-xl bg-muted p-3">
-                  <p className="font-display text-xl font-black text-accent">🗣️</p>
-                  <p className="text-xs text-muted-foreground">Speaking</p>
+                  <p className="text-xl">👂</p>
+                  <p className="text-xs text-muted-foreground font-bold">Luisteren</p>
+                </div>
+                <div className="rounded-xl bg-muted p-3">
+                  <p className="text-xl">✍️</p>
+                  <p className="text-xs text-muted-foreground font-bold">Schrijven</p>
                 </div>
               </div>
 
               <button
-                onClick={() => navigate("/exam")}
+                onClick={() => navigate("/exam-hub")}
                 className="inline-flex items-center gap-2 rounded-2xl bg-gradient-delft px-8 py-4 text-lg font-bold text-secondary-foreground shadow-card hover:shadow-card-hover transition-shadow"
               >
-                <Mic className="h-5 w-5" />
-                Start Exam Practice
+                Start Examen Oefenen
               </button>
             </div>
           </motion.div>
