@@ -44,7 +44,7 @@ export function useSpeechRecognition({
   const [interimText, setInterimText] = useState("");
 
   // Consume global mic state
-  const { isMicReady, checkMicHealth, ensureMicStream } = useMic();
+  const { isMicReady, ensureMicStream } = useMic();
 
   const recognitionRef = useRef<any>(null);
   const accumulatedTranscriptRef = useRef("");
@@ -285,30 +285,28 @@ export function useSpeechRecognition({
     };
 
     // ===== CONTEXT-AWARE START LOGIC =====
-    // Verify stream health before using the sync path — tracks may have died
-    // (OS reclaimed mic, tab was backgrounded on mobile, etc.)
-    const micActuallyHealthy = isMicReady && checkMicHealth();
+    //
+    // Two paths:
+    //   1. isMicReady = true  → permission was already granted on a previous tap.
+    //      Start SYNCHRONOUSLY, right here inside the user-gesture callback.
+    //      Do NOT call checkMicHealth() or ensureMicStream() here — on iOS, the
+    //      getUserMedia stream tracks can die when TTS audio plays (audio-session
+    //      reclaim), but SpeechRecognition manages its own audio session and does
+    //      not need the MicContext stream to be alive. Calling ensureMicStream()
+    //      concurrently with an active SpeechRecognition session also conflicts
+    //      with the mic hardware and silently stops capture.
+    //
+    //   2. isMicReady = false → first tap ever, or permission was never acquired.
+    //      Must await getUserMedia first (shows browser permission dialog).
+    //      Recognition starts after the await — gesture context is lost on iOS,
+    //      but this is unavoidable for the very first permission request.
 
-    if (micActuallyHealthy) {
-      // Mic is already hot from context — start SYNCHRONOUSLY to preserve iOS user gesture
-      logSpeechEvent(scenario, "sync-start", { reason: "global-mic-ready" });
+    if (isMicReady) {
+      // Permission granted before — always start synchronously to preserve iOS gesture context.
+      logSpeechEvent(scenario, "sync-start", { reason: "mic-permission-granted" });
       setIsListening(true);
       createAndStart();
       startNoSpeechTimer();
-      // NOTE: Do NOT call ensureMicStream() concurrently here.
-      // On iOS, calling getUserMedia while SpeechRecognition is already active can conflict
-      // with the microphone hardware and cause recognition to silently stop capturing audio.
-    } else if (isMicReady) {
-      // Mic permission was previously granted but the MediaStream tracks died
-      // (common on iOS when TTS audio reclaims the audio session between turns).
-      // Since permission is already granted, start recognition SYNCHRONOUSLY to
-      // preserve iOS gesture context — SpeechRecognition will re-acquire the mic internally.
-      // Re-acquire the MicContext stream in the background to restore health state.
-      logSpeechEvent(scenario, "sync-start", { reason: "mic-permission-granted-stream-dead" });
-      setIsListening(true);
-      createAndStart();
-      startNoSpeechTimer();
-      ensureMicStream().catch(() => {});
     } else {
       // First time — must await getUserMedia (permission dialog may appear)
       setIsPreparing(true);
@@ -327,7 +325,7 @@ export function useSpeechRecognition({
       };
       warmupAndStart();
     }
-  }, [scenario, lang, mode, autoStopSeconds, isSafari, isMobile, cleanupSession, submitFinal, ensureMicStream, isMicReady, checkMicHealth]);
+  }, [scenario, lang, mode, autoStopSeconds, isSafari, isMobile, cleanupSession, submitFinal, ensureMicStream, isMicReady]);
 
   const stopListening = useCallback(() => {
     logSpeechEvent(scenario, "stop-requested", {
