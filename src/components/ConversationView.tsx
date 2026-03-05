@@ -65,8 +65,10 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
   const preloadedAudioRef = useRef<{ text: string; blobUrl: string } | null>(null);
   // Holds an Audio element activated synchronously from a gesture, for use after an async gap
   const pendingActivatedAudioRef = useRef<HTMLAudioElement | null>(null);
+  // AbortController for the current in-flight TTS fetch — cancelled when recording starts
+  const ttsFetchControllerRef = useRef<AbortController | null>(null);
 
-  const fetchTtsBlob = useCallback(async (text: string): Promise<string> => {
+  const fetchTtsBlob = useCallback(async (text: string, signal?: AbortSignal): Promise<string> => {
     const response = await fetch(
       `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
       {
@@ -77,6 +79,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({ text, speed: speechRate }),
+        signal,
       }
     );
     if (!response.ok) throw new Error(`TTS failed: ${response.status}`);
@@ -165,9 +168,17 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
 
     // Not preloaded — fetch async then play.
     // Using the pre-activated element lets iOS WebKit honour the original gesture context.
-    fetchTtsBlob(spokenText)
-      .then((audioUrl) => playAudioUrl(audioUrl, activatedAudio))
+    // Track the fetch so stopCurrentAudio() can abort it if recording starts first.
+    const controller = new AbortController();
+    ttsFetchControllerRef.current = controller;
+    fetchTtsBlob(spokenText, controller.signal)
+      .then((audioUrl) => {
+        ttsFetchControllerRef.current = null;
+        playAudioUrl(audioUrl, activatedAudio);
+      })
       .catch((e) => {
+        ttsFetchControllerRef.current = null;
+        if (e?.name === "AbortError") return; // recording started first — expected
         console.error("ElevenLabs TTS failed, falling back to browser speech:", e);
         fallbackToSpeechSynthesis();
       });
@@ -251,11 +262,29 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     autoStopSeconds: recordingSettings.autoStopSeconds,
   });
 
-  /** Stop any active TTS audio and browser speech synthesis. */
+  /**
+   * Stop any active TTS audio and browser speech synthesis.
+   *
+   * Critical for mobile: must fully release the audio session before
+   * SpeechRecognition starts. `.pause()` alone keeps iOS/Android in
+   * "playback" audio-session mode, blocking recognition. Setting
+   * `audio.src = ""` forces an immediate session release.
+   *
+   * Also aborts any in-flight TTS fetch to prevent TTS from starting
+   * to play after recognition has already begun (race condition on slow networks).
+   */
   const stopCurrentAudio = useCallback(() => {
+    // Abort any in-flight TTS fetch so it can't start playing after recording begins
+    if (ttsFetchControllerRef.current) {
+      ttsFetchControllerRef.current.abort();
+      ttsFetchControllerRef.current = null;
+    }
     if (currentAudioRef.current) {
-      currentAudioRef.current.pause();
-      currentAudioRef.current = null;
+      const audio = currentAudioRef.current;
+      currentAudioRef.current = null; // null first so onended can't re-enter
+      audio.onended = null;           // remove handler — no cleanup needed mid-session
+      audio.pause();
+      audio.src = "";                 // KEY: forces iOS/Android to release the audio session
       setIsSpeaking(false);
     }
     try { speechSynthesis.cancel(); } catch {}
