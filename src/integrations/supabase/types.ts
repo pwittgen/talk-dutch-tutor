@@ -14,6 +14,62 @@ export type Database = {
   }
   public: {
     Tables: {
+      game_sessions: {
+        Row: {
+          completed_at: string | null
+          game_type: string
+          id: string
+          score: number | null
+          started_at: string
+          theme_id: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          game_type: string
+          id?: string
+          score?: number | null
+          started_at?: string
+          theme_id: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          game_type?: string
+          id?: string
+          score?: number | null
+          started_at?: string
+          theme_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_sessions_theme_id_fkey"
+            columns: ["theme_id"]
+            isOneToOne: false
+            referencedRelation: "vocab_themes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
       speaking_exam_sessions: {
         Row: {
           completed_at: string | null
@@ -116,14 +172,119 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      vocab_themes: {
+        Row: {
+          cefr_level: string
+          color: string
+          created_at: string
+          description: string
+          dutch_name: string
+          emoji: string
+          id: string
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          cefr_level?: string
+          color?: string
+          created_at?: string
+          description?: string
+          dutch_name?: string
+          emoji?: string
+          id?: string
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          cefr_level?: string
+          color?: string
+          created_at?: string
+          description?: string
+          dutch_name?: string
+          emoji?: string
+          id?: string
+          name?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      vocab_words: {
+        Row: {
+          audio_url: string | null
+          created_at: string
+          dutch: string
+          english: string
+          example_sentence: string | null
+          id: string
+          part_of_speech: string | null
+          sort_order: number
+          theme_id: string
+        }
+        Insert: {
+          audio_url?: string | null
+          created_at?: string
+          dutch: string
+          english: string
+          example_sentence?: string | null
+          id?: string
+          part_of_speech?: string | null
+          sort_order?: number
+          theme_id: string
+        }
+        Update: {
+          audio_url?: string | null
+          created_at?: string
+          dutch?: string
+          english?: string
+          example_sentence?: string | null
+          id?: string
+          part_of_speech?: string | null
+          sort_order?: number
+          theme_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vocab_words_theme_id_fkey"
+            columns: ["theme_id"]
+            isOneToOne: false
+            referencedRelation: "vocab_themes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
+      app_role: "admin" | "user"
       opgave_type: "video" | "1-photo" | "2-photos" | "3-photos"
       question_category: "beschrijven" | "mening" | "situatie"
     }
@@ -253,6 +414,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "user"],
       opgave_type: ["video", "1-photo", "2-photos", "3-photos"],
       question_category: ["beschrijven", "mening", "situatie"],
     },

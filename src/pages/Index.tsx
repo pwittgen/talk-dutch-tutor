@@ -1,17 +1,20 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Mic, BookOpen, MessageCircle, BarChart3, Settings } from "lucide-react";
+import { Mic, BookOpen, MessageCircle, BarChart3, Settings, LogIn, LogOut, Shield } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { scenarios, sections } from "@/data/scenarios";
-import { vocabCategories } from "@/data/vocabData";
+import { useVocabThemes } from "@/hooks/useVocabThemes";
 import ScenarioCard from "@/components/ScenarioCard";
 import VocabCategoryCard from "@/components/VocabCategoryCard";
 import SectionTabs, { type SectionId } from "@/components/SectionTabs";
+import { useAuth } from "@/hooks/useAuth";
 import heroImage from "@/assets/hero-dutch.jpg";
 
 const Index = () => {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<SectionId>("practice");
+  const { data: vocabThemes = [] } = useVocabThemes();
+  const { user, isAdmin, signOut } = useAuth();
 
   return (
     <div className="min-h-screen bg-background">
@@ -50,20 +53,48 @@ const Index = () => {
             transition={{ delay: 0.2, duration: 0.5 }}
             className="mt-5 flex flex-wrap items-center justify-center gap-2"
           >
-            <button
-              onClick={() => navigate("/progress")}
-              className="flex items-center gap-2 rounded-full bg-card px-4 py-2 shadow-card hover:shadow-card-hover transition-shadow"
-            >
-              <BarChart3 className="h-4 w-4 text-secondary" />
-              <span className="text-sm font-semibold text-foreground">My Progress</span>
-            </button>
-            <button
-              onClick={() => navigate("/settings")}
-              className="flex items-center gap-2 rounded-full bg-card px-4 py-2 shadow-card hover:shadow-card-hover transition-shadow"
-            >
-              <Settings className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-semibold text-foreground">Settings</span>
-            </button>
+            {user ? (
+              <>
+                <button
+                  onClick={() => navigate("/progress")}
+                  className="flex items-center gap-2 rounded-full bg-card px-4 py-2 shadow-card hover:shadow-card-hover transition-shadow"
+                >
+                  <BarChart3 className="h-4 w-4 text-secondary" />
+                  <span className="text-sm font-semibold text-foreground">My Progress</span>
+                </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => navigate("/admin/vocab")}
+                    className="flex items-center gap-2 rounded-full bg-card px-4 py-2 shadow-card hover:shadow-card-hover transition-shadow"
+                  >
+                    <Shield className="h-4 w-4 text-accent" />
+                    <span className="text-sm font-semibold text-foreground">Admin</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => navigate("/settings")}
+                  className="flex items-center gap-2 rounded-full bg-card px-4 py-2 shadow-card hover:shadow-card-hover transition-shadow"
+                >
+                  <Settings className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-semibold text-foreground">Settings</span>
+                </button>
+                <button
+                  onClick={() => signOut()}
+                  className="flex items-center gap-2 rounded-full bg-card px-4 py-2 shadow-card hover:shadow-card-hover transition-shadow"
+                >
+                  <LogOut className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-semibold text-foreground">Log Out</span>
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => navigate("/auth")}
+                className="flex items-center gap-2 rounded-full bg-card px-4 py-2 shadow-card hover:shadow-card-hover transition-shadow"
+              >
+                <LogIn className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold text-foreground">Log In</span>
+              </button>
+            )}
           </motion.div>
 
           {/* Section Tabs */}
@@ -125,8 +156,8 @@ const Index = () => {
               </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {vocabCategories.map((category, i) => (
-                <VocabCategoryCard key={category.id} category={category} index={i} />
+              {vocabThemes.map((theme, i) => (
+                <VocabCategoryCard key={theme.id} category={theme} index={i} />
               ))}
             </div>
           </motion.div>
