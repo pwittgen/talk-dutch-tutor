@@ -1,5 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { logSpeechEvent } from "@/lib/speechDebugLog";
+import { useMic } from "./MicContext";
 
 interface UseSpeechRecognitionOptions {
   /** Scenario name for debug logging */
@@ -21,8 +22,10 @@ const isMobileDevice = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgen
 
 /**
  * Robust speech recognition hook with:
- * - getUserMedia pre-warming (fixes mobile Safari/Chrome)
- * - Persistent mic stream across turns (no re-prompt per turn)
+ * - Global MicContext for persistent mic stream across turns
+ * - Synchronous start on subsequent turns (preserves iOS gesture context)
+ * - No destructive track refreshing
+ * - Fixed permission-denied restart loop
  * - Delayed auto-stop (waits for first speech before starting timer)
  * - No-speech timeout fallback
  * - Safari auto-restart handling
@@ -40,6 +43,9 @@ export function useSpeechRecognition({
   const [isPreparing, setIsPreparing] = useState(false);
   const [interimText, setInterimText] = useState("");
 
+  // Consume global mic state
+  const { isMicReady, ensureMicStream } = useMic();
+
   const recognitionRef = useRef<any>(null);
   const accumulatedTranscriptRef = useRef("");
   const isStoppingRef = useRef(false);
@@ -50,10 +56,6 @@ export function useSpeechRecognition({
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasReceivedSpeechRef = useRef(false);
 
-  // Persistent mic stream — acquired once, kept alive across turns
-  const micStreamRef = useRef<MediaStream | null>(null);
-  const micAcquiredRef = useRef(false);
-
   const isSafari = isSafariBrowser();
   const isMobile = isMobileDevice();
 
@@ -62,16 +64,6 @@ export function useSpeechRecognition({
   const onFallbackRef = useRef(onFallbackToText);
   useEffect(() => { onTranscriptRef.current = onTranscript; }, [onTranscript]);
   useEffect(() => { onFallbackRef.current = onFallbackToText; }, [onFallbackToText]);
-
-  /** Release mic hardware — only called on unmount */
-  const releaseMic = useCallback(() => {
-    if (micStreamRef.current) {
-      micStreamRef.current.getTracks().forEach(t => t.stop());
-      micStreamRef.current = null;
-      micAcquiredRef.current = false;
-      logSpeechEvent(scenario, "mic-released", {});
-    }
-  }, [scenario]);
 
   /** Clean up recognition session (timers, recognition instance) but NOT the mic stream */
   const cleanupSession = useCallback(() => {
@@ -108,43 +100,6 @@ export function useSpeechRecognition({
     onTranscriptRef.current(transcript);
   }, [scenario, cleanupSession]);
 
-  /** Acquire mic stream — on Safari mobile, always get a fresh stream to re-activate the audio pipeline */
-  const ensureMicStream = useCallback(async (): Promise<boolean> => {
-    // On Safari mobile, always refresh the stream to wake up the audio hardware
-    // Permission is cached so this won't show a prompt after the first time
-    const needsFreshStream = isSafari && isMobile;
-
-    if (!needsFreshStream && micStreamRef.current) {
-      const tracks = micStreamRef.current.getTracks();
-      const allLive = tracks.length > 0 && tracks.every(t => t.readyState === "live");
-      if (allLive) {
-        logSpeechEvent(scenario, "mic-reused", {});
-        return true; // Stream still good
-      }
-      // Stream died, clean up reference
-      micStreamRef.current = null;
-      micAcquiredRef.current = false;
-    }
-
-    // Release old stream before acquiring new one
-    if (micStreamRef.current) {
-      micStreamRef.current.getTracks().forEach(t => t.stop());
-      micStreamRef.current = null;
-    }
-
-    try {
-      logSpeechEvent(scenario, "mic-warmup-start", { fresh: needsFreshStream });
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      micStreamRef.current = stream;
-      micAcquiredRef.current = true;
-      logSpeechEvent(scenario, "mic-warmup-success", {});
-      return true;
-    } catch (err: any) {
-      logSpeechEvent(scenario, "mic-warmup-failed", { error: err?.message || String(err) });
-      return false;
-    }
-  }, [scenario, isSafari, isMobile]);
-
   const startListening = useCallback(() => {
     // Pre-flight checks
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -163,7 +118,7 @@ export function useSpeechRecognition({
     setInterimText("");
 
     logSpeechEvent(scenario, "start-requested", {
-      mode, autoStopSeconds, isSafari, isMobile, micAcquired: micAcquiredRef.current,
+      mode, autoStopSeconds, isSafari, isMobile, isMicReady,
     });
 
     const createAndStart = () => {
@@ -241,6 +196,8 @@ export function useSpeechRecognition({
 
         if (error === "not-allowed" || error === "service-not-allowed") {
           logSpeechEvent(scenario, "permission-denied", { error });
+          // FIX: Set isStoppingRef to prevent onend from triggering restart loop
+          isStoppingRef.current = true;
           cleanupSession();
           onFallbackRef.current();
           return;
@@ -309,21 +266,18 @@ export function useSpeechRecognition({
       }, 8000);
     };
 
-    // ===== KEY FIX: Preserve gesture context on subsequent calls =====
-    if (micAcquiredRef.current) {
-      // Mic permission already acquired — start recognition SYNCHRONOUSLY
-      // to preserve the user gesture context (critical for mobile Safari)
-      logSpeechEvent(scenario, "sync-start", { reason: "mic-already-acquired" });
+    // ===== CONTEXT-AWARE START LOGIC =====
+    if (isMicReady) {
+      // Mic is already hot from context — start SYNCHRONOUSLY to preserve iOS user gesture
+      logSpeechEvent(scenario, "sync-start", { reason: "global-mic-ready" });
       setIsListening(true);
       createAndStart();
       startNoSpeechTimer();
 
-      // Refresh mic stream in background (fire-and-forget) for Safari
-      if (isSafari && isMobile) {
-        ensureMicStream().catch(() => {});
-      }
+      // Concurrent warmup just in case Safari needs a ping (no track stopping!)
+      if (isSafari && isMobile) ensureMicStream().catch(() => {});
     } else {
-      // First time — must await getUserMedia (user expects brief delay)
+      // First time — must await getUserMedia
       setIsPreparing(true);
       const warmupAndStart = async () => {
         const micReady = await ensureMicStream();
@@ -340,7 +294,7 @@ export function useSpeechRecognition({
       };
       warmupAndStart();
     }
-  }, [scenario, lang, mode, autoStopSeconds, isSafari, isMobile, cleanupSession, submitFinal, ensureMicStream]);
+  }, [scenario, lang, mode, autoStopSeconds, isSafari, isMobile, cleanupSession, submitFinal, ensureMicStream, isMicReady]);
 
   const stopListening = useCallback(() => {
     logSpeechEvent(scenario, "stop-requested", {
@@ -375,14 +329,14 @@ export function useSpeechRecognition({
     cleanupSession();
   }, [scenario, cleanupSession]);
 
-  // Cleanup on unmount — this is where we release the mic
+  // Cleanup on unmount — only clean up recognition session, NOT the mic stream
   useEffect(() => {
     return () => {
       isStoppingRef.current = true;
       cleanupSession();
-      releaseMic();
+      // NOTE: We do NOT call releaseMic() here — the mic stays hot in MicContext
     };
-  }, [cleanupSession, releaseMic]);
+  }, [cleanupSession]);
 
   return {
     isListening,
