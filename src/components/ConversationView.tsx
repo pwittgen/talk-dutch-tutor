@@ -251,6 +251,32 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     autoStopSeconds: recordingSettings.autoStopSeconds,
   });
 
+  /** Stop any active TTS audio and browser speech synthesis. */
+  const stopCurrentAudio = useCallback(() => {
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+      setIsSpeaking(false);
+    }
+    try { speechSynthesis.cancel(); } catch {}
+  }, []);
+
+  /**
+   * Mic button click handler.
+   * Stops active TTS before starting recording — critical on mobile because
+   * having an Audio element playing while SpeechRecognition starts causes an
+   * audio-session conflict that silently prevents mic capture on Android and iOS.
+   */
+  const handleMicClick = useCallback(() => {
+    if (isPreparing) return;
+    if (isListening) {
+      stopListening();
+    } else {
+      stopCurrentAudio();
+      startListening();
+    }
+  }, [isPreparing, isListening, stopListening, stopCurrentAudio, startListening]);
+
   const handleTextSubmit = () => {
     if (textInput.trim()) {
       evaluateWithAI(textInput.trim());
@@ -313,6 +339,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     cancelListening(); // Stop any active recording without submitting
     setFeedback(null);
     setShowAnalysis(false);
+    setShowTextInput(false);
     if (currentTurn + 1 >= activeTurns.length) {
       onComplete();
     } else {
@@ -349,6 +376,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     setFeedback(null);
     setShowAnalysis(false);
     setRecordedAudioUrl(null);
+    setShowTextInput(false);
   };
 
   const playRecording = useCallback(() => {
@@ -490,7 +518,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
             {/* Microphone button */}
             <div className="flex flex-col items-center gap-4">
               <motion.button
-                onClick={isPreparing ? undefined : isListening ? stopListening : startListening}
+                onClick={handleMicClick}
                 whileTap={{ scale: 0.95 }}
                 disabled={isPreparing}
                 className={`relative flex h-20 w-20 items-center justify-center rounded-full transition-all duration-200 ${
