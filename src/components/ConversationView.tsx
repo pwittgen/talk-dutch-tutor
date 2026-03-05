@@ -230,7 +230,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     }
   };
 
-  const generateNextTurn = useCallback(async (history: Array<{ dutch: string; studentResponse?: string }>, nextTurnNumber: number) => {
+  const generateNextTurn = useCallback(async (history: Array<{ dutch: string; studentResponse?: string }>, nextTurnNumber: number): Promise<ConversationTurn | null> => {
     setIsGeneratingTurn(true);
     try {
       const { data, error } = await supabase.functions.invoke("generate-turn", {
@@ -258,9 +258,11 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
         updated[nextTurnNumber - 1] = newTurn;
         return updated;
       });
+
+      return newTurn;
     } catch (e) {
       console.error("Failed to generate next turn:", e);
-      // Fall back to static turn if available
+      return null;
     } finally {
       setIsGeneratingTurn(false);
     }
@@ -287,13 +289,20 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
       onComplete();
     } else {
       const nextTurnIdx = currentTurn + 1;
+      let nextTurn: ConversationTurn | null | undefined = null;
+
       // For open-ended, generate the next turn dynamically based on conversation
       if (openEnded && nextTurnIdx >= 1) {
-        await generateNextTurn(conversationHistory, nextTurnIdx + 1);
+        nextTurn = await generateNextTurn(conversationHistory, nextTurnIdx + 1);
       }
+
+      // Fall back to static turn if generation failed or not open-ended
+      if (!nextTurn) {
+        nextTurn = turns[nextTurnIdx];
+      }
+
       setCurrentTurn(nextTurnIdx);
       // Play TTS directly from gesture context (critical for mobile Safari)
-      const nextTurn = (openEnded ? dynamicTurns : turns)[nextTurnIdx];
       if (nextTurn && !muted) {
         speakDutch(nextTurn.dutchText);
       }
