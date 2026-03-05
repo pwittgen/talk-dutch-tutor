@@ -3,6 +3,8 @@ import { logSpeechEvent } from "@/lib/speechDebugLog";
 
 interface MicContextType {
   isMicReady: boolean;
+  /** Check if the mic stream tracks are actually alive (no async, no getUserMedia). */
+  checkMicHealth: () => boolean;
   ensureMicStream: () => Promise<boolean>;
   releaseMic: () => void;
 }
@@ -12,6 +14,21 @@ const MicContext = createContext<MicContextType | null>(null);
 export function MicProvider({ children, globalScenario = "app-global" }: { children: ReactNode; globalScenario?: string }) {
   const [isMicReady, setIsMicReady] = useState(false);
   const micStreamRef = useRef<MediaStream | null>(null);
+
+  /** Synchronous health check — returns true only if tracks are alive. */
+  const checkMicHealth = useCallback((): boolean => {
+    if (!micStreamRef.current) return false;
+    const tracks = micStreamRef.current.getTracks();
+    const healthy = tracks.length > 0 && tracks.every(t => t.readyState === "live");
+    if (!healthy) {
+      // Tracks died (OS reclaimed mic, tab backgrounded, etc.) — update state
+      logSpeechEvent(globalScenario, "global-mic-health-dead", {});
+      tracks.forEach(t => t.stop());
+      micStreamRef.current = null;
+      setIsMicReady(false);
+    }
+    return healthy;
+  }, [globalScenario]);
 
   const ensureMicStream = useCallback(async (): Promise<boolean> => {
     // Check if we already have a healthy, live stream
@@ -56,7 +73,7 @@ export function MicProvider({ children, globalScenario = "app-global" }: { child
   }, [releaseMic]);
 
   return (
-    <MicContext.Provider value={{ isMicReady, ensureMicStream, releaseMic }}>
+    <MicContext.Provider value={{ isMicReady, checkMicHealth, ensureMicStream, releaseMic }}>
       {children}
     </MicContext.Provider>
   );

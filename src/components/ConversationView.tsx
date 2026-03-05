@@ -150,8 +150,18 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     }
 
     // Consume any pre-activated element (created synchronously in handleNext before an await)
-    const activatedAudio = pendingActivatedAudioRef.current ?? undefined;
+    let activatedAudio = pendingActivatedAudioRef.current ?? undefined;
     pendingActivatedAudioRef.current = null;
+
+    // If no pre-activated element exists and we're about to enter the async path,
+    // create one NOW — we're still inside a user gesture so the activation succeeds.
+    // This covers: regular turn transitions (no preloaded audio), "Listen" button,
+    // "Listen to ideal response" — all called synchronously from click handlers.
+    if (!activatedAudio) {
+      const audio = new Audio();
+      audio.play().catch(() => {}); // Fails (no src) but activates the element
+      activatedAudio = audio;
+    }
 
     // Not preloaded — fetch async then play.
     // Using the pre-activated element lets iOS WebKit honour the original gesture context.
