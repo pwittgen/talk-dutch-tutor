@@ -44,7 +44,7 @@ export function useSpeechRecognition({
   const [interimText, setInterimText] = useState("");
 
   // Consume global mic state
-  const { isMicReady, ensureMicStream } = useMic();
+  const { isMicReady, checkMicHealth, ensureMicStream } = useMic();
 
   const recognitionRef = useRef<any>(null);
   const accumulatedTranscriptRef = useRef("");
@@ -55,6 +55,9 @@ export function useSpeechRecognition({
   const restartCountRef = useRef(0);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasReceivedSpeechRef = useRef(false);
+  // Session generation counter — prevents stale onend handlers from restarting
+  // a recognition instance that belongs to a previous session.
+  const sessionIdRef = useRef(0);
 
   const isSafari = isSafariBrowser();
   const isMobile = isMobileDevice();
@@ -108,6 +111,16 @@ export function useSpeechRecognition({
       onFallbackRef.current();
       return;
     }
+
+    // Clean up any zombie recognition from a previous session before starting fresh.
+    // This prevents two SpeechRecognition instances fighting for the mic.
+    try { recognitionRef.current?.abort(); } catch {}
+    recognitionRef.current = null;
+
+    // Bump session generation — stale onend handlers from the previous session
+    // will see a mismatched ID and exit without restarting.
+    sessionIdRef.current++;
+    const currentSessionId = sessionIdRef.current;
 
     // Reset state
     accumulatedTranscriptRef.current = "";
@@ -215,7 +228,12 @@ export function useSpeechRecognition({
           hasSubmitted: hasSubmittedRef.current,
           accumulated: accumulatedTranscriptRef.current.trim(),
           restarts: restartCountRef.current,
+          sessionId: currentSessionId,
+          currentSessionId: sessionIdRef.current,
         });
+
+        // Guard: if a newer session has started, this onend is stale — bail out.
+        if (currentSessionId !== sessionIdRef.current) return;
 
         if (hasSubmittedRef.current) return;
 
@@ -267,7 +285,11 @@ export function useSpeechRecognition({
     };
 
     // ===== CONTEXT-AWARE START LOGIC =====
-    if (isMicReady) {
+    // Verify stream health before using the sync path — tracks may have died
+    // (OS reclaimed mic, tab was backgrounded on mobile, etc.)
+    const micActuallyHealthy = isMicReady && checkMicHealth();
+
+    if (micActuallyHealthy) {
       // Mic is already hot from context — start SYNCHRONOUSLY to preserve iOS user gesture
       logSpeechEvent(scenario, "sync-start", { reason: "global-mic-ready" });
       setIsListening(true);
@@ -294,7 +316,7 @@ export function useSpeechRecognition({
       };
       warmupAndStart();
     }
-  }, [scenario, lang, mode, autoStopSeconds, isSafari, isMobile, cleanupSession, submitFinal, ensureMicStream, isMicReady]);
+  }, [scenario, lang, mode, autoStopSeconds, isSafari, isMobile, cleanupSession, submitFinal, ensureMicStream, isMicReady, checkMicHealth]);
 
   const stopListening = useCallback(() => {
     logSpeechEvent(scenario, "stop-requested", {
