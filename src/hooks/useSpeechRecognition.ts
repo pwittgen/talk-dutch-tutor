@@ -273,9 +273,9 @@ export function useSpeechRecognition({
       setIsListening(true);
       createAndStart();
       startNoSpeechTimer();
-
-      // Concurrent warmup just in case Safari needs a ping (no track stopping!)
-      if (isSafari && isMobile) ensureMicStream().catch(() => {});
+      // NOTE: Do NOT call ensureMicStream() concurrently here.
+      // On iOS, calling getUserMedia while SpeechRecognition is already active can conflict
+      // with the microphone hardware and cause recognition to silently stop capturing audio.
     } else {
       // First time — must await getUserMedia
       setIsPreparing(true);
