@@ -240,6 +240,90 @@ There is minimal test coverage currently. When adding tests, use `@testing-libra
 
 ---
 
+## Critical Functions — Cross-Platform Requirements
+
+The following three functions are **critical to the core user experience** and must work correctly across all target platforms: desktop (Chrome, Firefox, Safari, Edge) and mobile (iOS Safari, Android Chrome), including older browser versions.
+
+### Where they are active
+
+These functions are used in:
+- **All scenario practice exercises** — every scenario under the Practice tab (`/scenario/:id`) uses `ConversationView.tsx`
+- **Random Encounter** — the open-ended scenario (`openEnded: true`) which also dynamically generates turns via AI
+
+They are **not** used in vocabulary flashcards or matching games.
+
+---
+
+### 1. Speech Recording
+
+**What it does:** Captures the student's spoken Dutch answer via the device microphone.
+
+**Implementation:** `src/hooks/useSpeechRecognition.ts` + `src/hooks/MicContext.tsx`
+
+**Cross-platform requirements and constraints:**
+
+| Platform | Constraint |
+|---|---|
+| iOS Safari | `recognition.start()` must be called **synchronously** from a user tap — never after `await`. Loss of gesture context causes silent failure (mic indicator shows active but captures nothing). |
+| iOS Safari | `getUserMedia` must be called at least once first (to get mic permission), but on subsequent turns the recognition must start synchronously using the already-acquired stream. |
+| Android Chrome | Generally reliable. Supports `continuous: true`. |
+| Desktop Chrome/Edge | Most capable. Supports continuous recognition and interim results. |
+| Desktop Firefox | `SpeechRecognition` API not supported — falls back to text input automatically. |
+| Desktop Safari | Limited support; treated similarly to iOS Safari with `continuous: false` and auto-restart. |
+
+**Key design decisions to preserve:**
+- `MicContext` keeps the mic stream alive across turns — do not stop/restart the hardware stream between turns
+- On first use, `getUserMedia` runs async (user expects a brief delay); on subsequent turns, recognition starts synchronously
+- Auto-stop timer begins only after first speech is detected (not on mic open)
+- Safari gets up to 15 auto-restarts; Chrome gets 5
+
+---
+
+### 2. Speech Interpretation (AI Evaluation)
+
+**What it does:** Takes the transcribed text from speech recognition and evaluates it for correctness, grammar, and appropriateness using AI.
+
+**Implementation:** `supabase/functions/evaluate-dutch/` edge function, called from `ConversationView.tsx` via `supabase.functions.invoke("evaluate-dutch", ...)`
+
+**Cross-platform requirements:**
+- Must handle **speech recognition transcription errors** gracefully — the AI is instructed to be forgiving of punctuation, capitalisation, and word-order issues that result from imperfect STT
+- Must work even when the primary AI call fails — `ConversationView.tsx` has a local fallback that does simple string matching against `expectedResponses`
+- Rate limit (HTTP 429) and credit exhaustion (HTTP 402) errors are handled with user-visible messages, not silent failures
+- The `openEnded` mode (used in Random Encounter) accepts any contextually valid Dutch response rather than checking against expected answers
+
+**Two evaluation modes:**
+- `openEnded: true` — any valid contextual response is accepted; used in Random Encounter
+- `examMode: true` — A2-level rules applied; short answers rated positively; used in exam simulation
+
+---
+
+### 3. Speech Pronunciation (TTS Playback)
+
+**What it does:** Plays the Dutch tutor's dialogue aloud so the student hears correct pronunciation before responding.
+
+**Implementation:** `speakDutch()` in `src/components/ConversationView.tsx`, calling the `elevenlabs-tts` edge function.
+
+**Cross-platform requirements:**
+
+| Platform | Constraint |
+|---|---|
+| iOS Safari | `audio.play()` must be called **synchronously from a user gesture**. Calling it from `useEffect`, `setTimeout`, or after `await` (outside a tap handler) causes silent failure — audio does not play. |
+| Android Chrome | Auto-play is generally permitted after first interaction. |
+| All browsers | ElevenLabs is the primary TTS. If it fails, falls back to browser `SpeechSynthesisUtterance` with `nl-NL` locale and Dutch voice selection. |
+
+**Key design decisions to preserve:**
+- On turn transitions, `speakDutch()` is called **directly inside `handleNext()`** (the button click handler), not deferred via `useEffect`
+- The initial auto-play on first load uses a `useEffect` + `setTimeout` — this is intentional and only fires once (on mount). It does not work on iOS but that is an accepted limitation for the first turn only.
+- Audio is preloaded for the next turn in the background after the current turn's audio starts playing (`preloadNextTurn()`)
+- Speech rate is user-adjustable (0.5x–1.3x) via a slider; the rate is passed to both ElevenLabs and the browser fallback
+
+**Do not break:**
+- The fallback chain: ElevenLabs → browser speech synthesis
+- The `muted` prop check at the start of `speakDutch()` — always respect it
+- The `preloadNextTurn()` background preload — it reduces latency on fast devices
+
+---
+
 ## Known Issues / Active Work
 
 See `.lovable/plan.md` for detailed analysis. Key issues:
