@@ -63,6 +63,8 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
   const [isSpeaking, setIsSpeaking] = useState(false);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const preloadedAudioRef = useRef<{ text: string; blobUrl: string } | null>(null);
+  // Holds an Audio element activated synchronously from a gesture, for use after an async gap
+  const pendingActivatedAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const fetchTtsBlob = useCallback(async (text: string): Promise<string> => {
     const response = await fetch(
@@ -118,9 +120,11 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
       speechSynthesis.speak(utterance);
     };
 
-    const playAudioUrl = (audioUrl: string) => {
-      // Create Audio with src set immediately so play() can be called synchronously
-      const audio = new Audio(audioUrl);
+    const playAudioUrl = (audioUrl: string, preActivated?: HTMLAudioElement) => {
+      // If a pre-activated element is supplied (iOS gesture unlock trick), reuse it.
+      // Otherwise create a fresh Audio — src is set immediately so play() is synchronous.
+      const audio = preActivated ?? new Audio(audioUrl);
+      if (preActivated) preActivated.src = audioUrl;
       currentAudioRef.current = audio;
       audio.onended = () => {
         setIsSpeaking(false);
@@ -140,13 +144,19 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     if (preloadedAudioRef.current?.text === spokenText) {
       const { blobUrl } = preloadedAudioRef.current;
       preloadedAudioRef.current = null;
+      pendingActivatedAudioRef.current = null; // discard stale activation if any
       playAudioUrl(blobUrl);
       return;
     }
 
-    // Not preloaded — fetch async then play (gesture context may be lost on iOS Safari)
+    // Consume any pre-activated element (created synchronously in handleNext before an await)
+    const activatedAudio = pendingActivatedAudioRef.current ?? undefined;
+    pendingActivatedAudioRef.current = null;
+
+    // Not preloaded — fetch async then play.
+    // Using the pre-activated element lets iOS WebKit honour the original gesture context.
     fetchTtsBlob(spokenText)
-      .then((audioUrl) => playAudioUrl(audioUrl))
+      .then((audioUrl) => playAudioUrl(audioUrl, activatedAudio))
       .catch((e) => {
         console.error("ElevenLabs TTS failed, falling back to browser speech:", e);
         fallbackToSpeechSynthesis();
@@ -299,8 +309,16 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
       const nextTurnIdx = currentTurn + 1;
       let nextTurn: ConversationTurn | null | undefined = null;
 
-      // For open-ended, generate the next turn dynamically based on conversation
+      // For open-ended, generate the next turn dynamically based on conversation.
+      // Pre-activate an Audio element synchronously HERE (gesture context is still live)
+      // so that the subsequent async play() call succeeds on iOS WebKit browsers.
       if (openEnded && nextTurnIdx >= 1) {
+        if (!muted) {
+          const audio = new Audio();
+          // play() will fail (no src) but activates the element in iOS gesture context
+          audio.play().catch(() => {});
+          pendingActivatedAudioRef.current = audio;
+        }
         nextTurn = await generateNextTurn(conversationHistory, nextTurnIdx + 1);
       }
 
