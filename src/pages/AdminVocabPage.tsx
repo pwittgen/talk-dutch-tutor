@@ -191,9 +191,14 @@ const AdminVocabPage = () => {
             {/* Word list */}
             <div className="flex items-center justify-between">
               <h2 className="font-display text-xl font-bold text-foreground">Words ({words.length})</h2>
-              <Button size="sm" onClick={() => setEditingWord({ dutch: "", english: "", example_sentence: "", part_of_speech: "", sort_order: words.length })}>
-                <Plus className="h-4 w-4 mr-1" /> Add Word
-              </Button>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+                  <Upload className="h-4 w-4 mr-1" /> Import
+                </Button>
+                <Button size="sm" onClick={() => setEditingWord({ dutch: "", english: "", example_sentence: "", part_of_speech: "", sort_order: words.length })}>
+                  <Plus className="h-4 w-4 mr-1" /> Add Word
+                </Button>
+              </div>
             </div>
 
             {editingWord && !editingWord.id && (
