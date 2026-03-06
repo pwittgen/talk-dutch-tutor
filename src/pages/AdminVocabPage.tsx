@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Plus, Pencil, Trash2, ChevronRight, Save, X } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, ChevronRight, Save, X, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import type { DbVocabTheme, DbVocabWord } from "@/hooks/useVocabThemes";
