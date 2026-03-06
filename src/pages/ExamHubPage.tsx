@@ -47,8 +47,8 @@ const examCategories = [
     emoji: "✍️",
     icon: PenLine,
     description: "Schrijf korte teksten en berichten",
-    available: false,
-    stats: { questions: 4 },
+    available: true,
+    stats: { questions: 4, time: "30 min" },
   },
 ];
 
