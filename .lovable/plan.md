@@ -1,33 +1,33 @@
 
 
-## Analysis
+## Add Spreadsheet Import to Admin Vocab Page
 
-Two issues found in the logs and code:
+### What gets built
 
-### Issue 1: Speech Recognition loses gesture context
-In `startListening`, the `warmupAndStart` async function does `await ensureMicStream()` before calling `createAndStart()`. On mobile Safari, after an `await`, the user gesture context is lost. This means `recognition.start()` runs outside a trusted gesture, causing Safari to silently fail to capture audio. This explains why the mic "starts" (green indicators) but captures nothing (`submit-empty`).
+A CSV/Excel upload button on the Admin Vocab page that lets you bulk-import words into a theme from a spreadsheet.
 
-### Issue 2: TTS not playing on next turn
-The auto-play effect (line 149) fires `speakDutch()` inside a `setTimeout` within `useEffect`. This is not a user gesture context, so Safari blocks audio playback on turn transitions.
+### How it works
 
-## Plan
+1. **Upload UI**: An "Import Words" button appears next to "Add Word" when viewing a theme's word list. Clicking it opens a file picker accepting `.csv` and `.xlsx` files.
 
-### 1. Fix gesture context in `useSpeechRecognition.ts`
+2. **Expected spreadsheet format** (columns):
+   - Column A: Dutch word
+   - Column B: English translation
+   - Column C: Example sentence (optional)
+   - Column D: Part of speech (optional)
 
-Restructure `startListening` so that `recognition.start()` is called **synchronously** from the click handler, not after an `await`:
+3. **Preview & Confirm**: After selecting a file, a preview table shows the parsed rows so you can verify before importing. A "Confirm Import" button inserts all rows into the selected theme.
 
-- Track whether mic permission has been acquired at least once (`micAcquiredRef`)
-- On first call: `await getUserMedia` then `createAndStart()` (user expects a brief delay)
-- On subsequent calls: call `createAndStart()` **immediately** (synchronously), and refresh the `getUserMedia` stream in the background (fire-and-forget) — this preserves the gesture context chain
-- This ensures Safari's audio pipeline is activated by the trusted gesture
+4. **Implementation**:
+   - Use the `xlsx` npm package (SheetJS) to parse both CSV and Excel files client-side
+   - Map columns to the `vocab_words` table fields (`dutch`, `english`, `example_sentence`, `part_of_speech`)
+   - Batch insert via Supabase `.insert()` with the selected `theme_id`
+   - Show a success toast with the count of imported words
 
-### 2. Fix TTS playback on turn change in `ConversationView.tsx`
+### Files changed
+- `src/pages/AdminVocabPage.tsx` — add import button + preview modal in the word list section
+- New dependency: `xlsx` (SheetJS) for spreadsheet parsing
 
-- In `handleNext`, call `speakDutch()` directly after setting the next turn (within the click handler's gesture context), instead of relying on the `useEffect` + `setTimeout`
-- Keep the `useEffect` only for the initial mount/first turn
-- This ensures Safari allows audio playback since it's triggered from a user gesture
-
-### 3. Clean up cancel flow
-
-- Ensure `cancelListening` resets all refs properly so the next `startListening` works cleanly
+### No database changes needed
+The existing `vocab_words` table and RLS policies already support admin inserts.
 
