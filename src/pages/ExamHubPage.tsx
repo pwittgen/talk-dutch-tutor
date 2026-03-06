@@ -64,6 +64,10 @@ const ExamHubPage = () => {
     return <LuisterenQuiz onBack={() => setActiveSection("hub")} />;
   }
 
+  if (activeSection === "schrijven") {
+    return <SchrijvenQuiz onBack={() => setActiveSection("hub")} />;
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-10">
