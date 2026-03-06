@@ -225,6 +225,13 @@ const AdminVocabPage = () => {
                 </motion.div>
               )
             ))}
+            <VocabImportDialog
+              themeId={selectedTheme!}
+              themeName={currentTheme?.name || ""}
+              existingWordCount={words.length}
+              open={importOpen}
+              onOpenChange={setImportOpen}
+            />
           </>
         )}
       </div>
