@@ -2,6 +2,7 @@ export interface VocabWord {
   dutch: string;
   english: string;
   example?: string;
+  exampleTranslation?: string;
   audio?: string;
 }
 

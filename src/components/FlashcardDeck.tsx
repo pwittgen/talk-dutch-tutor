@@ -108,6 +108,9 @@ const FlashcardDeck = ({ words, onComplete }: FlashcardDeckProps) => {
                     <div className="mt-4 rounded-xl bg-muted/50 p-3">
                       <p className="text-sm text-muted-foreground font-medium">Example:</p>
                       <p className="text-sm font-semibold text-foreground mt-1">{word.example}</p>
+                      {word.exampleTranslation && (
+                        <p className="text-xs text-muted-foreground mt-1 italic">{word.exampleTranslation}</p>
+                      )}
                     </div>
                   )}
                 </div>

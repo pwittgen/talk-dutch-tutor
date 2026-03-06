@@ -24,6 +24,7 @@ const LearnCategoryPage = () => {
     dutch: w.dutch,
     english: w.english,
     example: w.example_sentence || undefined,
+    exampleTranslation: w.part_of_speech || undefined,
   }));
 
   if (isLoading) {

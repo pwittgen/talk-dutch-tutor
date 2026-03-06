@@ -180,7 +180,7 @@ const VocabImportDialog = ({
                     <TableHead>Dutch</TableHead>
                     <TableHead>English</TableHead>
                     <TableHead>Example</TableHead>
-                    <TableHead>POS</TableHead>
+                    <TableHead>Translation</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
