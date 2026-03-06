@@ -4,8 +4,9 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Mic, BookOpen, Headphones, PenLine, Lock } from "lucide-react";
 import LezenQuiz from "@/components/LezenQuiz";
 import LuisterenQuiz from "@/components/LuisterenQuiz";
+import SchrijvenQuiz from "@/components/SchrijvenQuiz";
 
-type ExamSection = "hub" | "lezen" | "luisteren";
+type ExamSection = "hub" | "lezen" | "luisteren" | "schrijven";
 
 const examCategories = [
   {
@@ -46,8 +47,8 @@ const examCategories = [
     emoji: "✍️",
     icon: PenLine,
     description: "Schrijf korte teksten en berichten",
-    available: false,
-    stats: { questions: 4 },
+    available: true,
+    stats: { questions: 4, time: "30 min" },
   },
 ];
 
@@ -61,6 +62,10 @@ const ExamHubPage = () => {
 
   if (activeSection === "luisteren") {
     return <LuisterenQuiz onBack={() => setActiveSection("hub")} />;
+  }
+
+  if (activeSection === "schrijven") {
+    return <SchrijvenQuiz onBack={() => setActiveSection("hub")} />;
   }
 
   return (
