@@ -20,6 +20,7 @@ const AdminVocabPage = () => {
   const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
   const [editingTheme, setEditingTheme] = useState<Partial<DbVocabTheme> | null>(null);
   const [editingWord, setEditingWord] = useState<Partial<DbVocabWord> | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const { data: themes = [], isLoading: themesLoading } = useQuery({
     queryKey: ["admin-themes"],
