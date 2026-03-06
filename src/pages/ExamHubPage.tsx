@@ -15,7 +15,7 @@ const examCategories = [
     icon: BookOpen,
     description: "Lees teksten en beantwoord meerkeuzevragen",
     available: true,
-    stats: { questions: 24, texts: 8 },
+    stats: { questions: 25, texts: 13 },
   },
   {
     id: "spreken" as const,
