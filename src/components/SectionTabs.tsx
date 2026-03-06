@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 
 export type SectionId = "practice" | "learn" | "exam";
 
@@ -14,12 +15,22 @@ const tabs: { id: SectionId; label: string; emoji: string; subtitle: string }[] 
 ];
 
 const SectionTabs = ({ activeSection, onSectionChange }: SectionTabsProps) => {
+  const navigate = useNavigate();
+
+  const handleTabClick = (tabId: SectionId) => {
+    if (tabId === "exam") {
+      navigate("/exam-hub");
+    } else {
+      onSectionChange(tabId);
+    }
+  };
+
   return (
     <div className="flex gap-1 rounded-2xl bg-muted p-1.5">
       {tabs.map((tab) => (
         <button
           key={tab.id}
-          onClick={() => onSectionChange(tab.id)}
+          onClick={() => handleTabClick(tab.id)}
           className={`relative flex-1 rounded-xl px-3 py-2.5 text-center transition-colors ${
             activeSection === tab.id
               ? "text-foreground"

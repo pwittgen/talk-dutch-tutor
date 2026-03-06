@@ -3,6 +3,7 @@ export interface LezenQuestion {
   question: string;
   options: string[];
   correctIndex: number;
+  topic?: string; // used for improvement suggestions
 }
 
 export interface LezenText {
@@ -43,12 +44,14 @@ U onthoudt informatie beter als u het aan iemand hebt verteld.`,
         question: "Jamie heeft volgende week een belangrijk examen. Wat moet hij volgens de tekst het eerste doen?",
         options: ["Een rustige plek zoeken", "Een planning maken", "Nadenken over de inhoud"],
         correctIndex: 1,
+        topic: "leesstrategie",
       },
       {
         id: "tips-2",
         question: "Wanneer kan je volgens de tekst het beste leren?",
         options: ["'s ochtends", "'s middags", "'s avonds", "Dat moet je zelf bepalen"],
         correctIndex: 3,
+        topic: "detailvragen",
       },
       {
         id: "tips-3",
@@ -60,6 +63,7 @@ U onthoudt informatie beter als u het aan iemand hebt verteld.`,
           "Leer elke dag een beetje en vertel aan iemand wat je hebt gelezen",
         ],
         correctIndex: 3,
+        topic: "samenvatten",
       },
     ],
   },
@@ -97,18 +101,21 @@ Organisator hardloopwedstrijd`,
           "Hij wil ze oproepen met z'n allen naar de hardlopers te komen kijken.",
         ],
         correctIndex: 0,
+        topic: "hoofdgedachte",
       },
       {
         id: "hardloop-2",
         question: "Gaston woont in de Flamingostraat. Wanneer moet hij zijn auto weghalen op zaterdag 13 juni?",
         options: ["Voor 10.00 uur", "Voor 11.00 uur", "Voor 16.00 uur", "Voor 17.00 uur"],
         correctIndex: 0,
+        topic: "detailvragen",
       },
       {
         id: "hardloop-3",
         question: "Waar zijn de start en de finish van de hardloopwedstrijd?",
         options: ["In de Dorpsstraat", "Op het Dorpsplein", "In de Flamingostraat", "Op de Bergsebaan"],
         correctIndex: 1,
+        topic: "detailvragen",
       },
     ],
   },
@@ -143,6 +150,7 @@ Woont u op de vijfde verdieping of hoger? Wij bezorgen alleen als er een lift is
         question: "Modibo woont in een flat, op de tweede verdieping. Hij heeft een tafel van 20 kilo gekocht. Wat moet hij betalen voor bezorging?",
         options: ["€ 54,-", "€ 64,-", "€ 104,-", "€ 144,-"],
         correctIndex: 1,
+        topic: "tabellen-en-schema",
       },
       {
         id: "meubel-2",
@@ -154,6 +162,7 @@ Woont u op de vijfde verdieping of hoger? Wij bezorgen alleen als er een lift is
           "Door een e-mail te sturen",
         ],
         correctIndex: 2,
+        topic: "detailvragen",
       },
       {
         id: "meubel-3",
@@ -165,6 +174,7 @@ Woont u op de vijfde verdieping of hoger? Wij bezorgen alleen als er een lift is
           "Ze moet de meubels zelf ophalen",
         ],
         correctIndex: 1,
+        topic: "conclusies-trekken",
       },
     ],
   },
@@ -193,6 +203,7 @@ Henk de Groot`,
         question: "Sabrina wil weten of haar man ook mee mag. Aan wie moet ze dat vragen?",
         options: ["Aan Jan", "Aan Ingmar", "Aan Charlotte", "Aan Henk"],
         correctIndex: 2,
+        topic: "detailvragen",
       },
       {
         id: "kano-2",
@@ -204,12 +215,14 @@ Henk de Groot`,
           "Handdoeken",
         ],
         correctIndex: 2,
+        topic: "detailvragen",
       },
       {
         id: "kano-3",
         question: "Hoe laat eindigt het programma?",
         options: ["Om half 8", "Om half 9", "Om half 11", "Om half 12"],
         correctIndex: 1,
+        topic: "detailvragen",
       },
     ],
   },
@@ -238,23 +251,14 @@ Suzanne`,
         question: "Waar is de tas van Suzanne?",
         options: ["In de trein", "Op haar bureau", "Bij de portier", "Thuis"],
         correctIndex: 1,
+        topic: "detailvragen",
       },
       {
         id: "tas-2",
         question: "Wat zit er NIET in de tas van Suzanne?",
         options: ["Een laptop", "Een boek", "Een bril", "Een telefoon"],
         correctIndex: 3,
-      },
-      {
-        id: "tas-3",
-        question: "Wat moet Jasper doen met de tas?",
-        options: [
-          "De tas naar Suzanne brengen",
-          "De tas naar de portier brengen",
-          "De tas in de trein brengen",
-          "De tas naar haar huis brengen",
-        ],
-        correctIndex: 1,
+        topic: "detailvragen",
       },
     ],
   },
@@ -288,12 +292,14 @@ Jan, Marie, Bas en Mo`,
           "Alleen sportkleren",
         ],
         correctIndex: 1,
+        topic: "conclusies-trekken",
       },
       {
         id: "sport-2",
         question: "De kinderen van Halima doen 's middags mee met de sportdag. Welke sport gaan ze doen?",
         options: ["Tennis", "Basketbal", "Voetbal", "Volleybal"],
         correctIndex: 3,
+        topic: "detailvragen",
       },
       {
         id: "sport-3",
@@ -305,6 +311,7 @@ Jan, Marie, Bas en Mo`,
           "€ 15,- betalen bij Jan",
         ],
         correctIndex: 1,
+        topic: "detailvragen",
       },
     ],
   },
@@ -332,6 +339,7 @@ David, William en Elise`,
         question: "Michael wil met de bus mee naar de bruiloft. Bij wie moet hij zich opgeven?",
         options: ["Bij William", "Bij David", "Bij Elise", "Bij Nadia"],
         correctIndex: 1,
+        topic: "detailvragen",
       },
       {
         id: "bruiloft-2",
@@ -343,17 +351,7 @@ David, William en Elise`,
           "Bloemen",
         ],
         correctIndex: 2,
-      },
-      {
-        id: "bruiloft-3",
-        question: "Waarom stuurt de feestcommissie deze e-mail vooral?",
-        options: [
-          "Om collega's uit te nodigen voor de bruiloft",
-          "Om collega's te vragen mee te doen met het cadeau en de bus",
-          "Om iedereen te vertellen dat Nadia gaat trouwen",
-          "Om geld in te zamelen voor een feest",
-        ],
-        correctIndex: 1,
+        topic: "conclusies-trekken",
       },
     ],
   },
@@ -385,19 +383,302 @@ Kosten voor de cursus: € 105,-`,
         question: "Myra geeft les op een basisschool. Ze wil een EHBO-cursus volgen die past bij haar werk. Welke cursus is het meest geschikt voor Myra?",
         options: ["Cursus EHBO I", "Cursus EHBO II", "Cursus EHBO III"],
         correctIndex: 2,
+        topic: "conclusies-trekken",
       },
       {
         id: "ehbo-2",
         question: "Aylin wil leren reanimeren. In hoeveel bijeenkomsten leert zij dat?",
         options: ["Eén bijeenkomst", "Vier bijeenkomsten", "Zes bijeenkomsten"],
         correctIndex: 0,
+        topic: "detailvragen",
       },
       {
         id: "ehbo-3",
         question: "Ronald wil zoveel mogelijk verschillende dingen leren over EHBO. Welke cursus kan hij het beste kiezen?",
         options: ["Cursus EHBO I", "Cursus EHBO II", "Cursus EHBO III"],
         correctIndex: 0,
+        topic: "conclusies-trekken",
+      },
+    ],
+  },
+  // ===== NEW PRACTICE TEXTS =====
+  {
+    id: "huisarts",
+    title: "Afspraak bij de huisarts",
+    situation: "Op de website van een huisartsenpraktijk staat informatie voor patiënten.",
+    text: `Huisartsenpraktijk De Linde
+
+Welkom bij onze praktijk! Hier vindt u belangrijke informatie.
+
+Openingstijden:
+Maandag t/m vrijdag: 8.00 – 17.00 uur
+Zaterdag en zondag: gesloten
+
+Een afspraak maken
+U kunt een afspraak maken via onze website of door te bellen. Bellen kan tussen 8.00 en 10.00 uur 's ochtends. Buiten deze tijden kunt u alleen via de website een afspraak maken. Een afspraak duurt 10 minuten. Hebt u meer tijd nodig? Vraag dan een dubbele afspraak.
+
+Spoedgevallen
+Hebt u dringend hulp nodig? Bel dan het spoednummer: 030-1234567. Dit nummer is 24 uur per dag bereikbaar. Ga bij levensbedreigende situaties altijd naar de Eerste Hulp of bel 112.
+
+Herhaalrecepten
+Hebt u een nieuw recept nodig voor medicijnen die u al gebruikt? U kunt een herhaalrecept aanvragen via de website of via de apotheek. U kunt het recept na twee werkdagen ophalen bij uw apotheek.
+
+Verhuizing
+Gaat u verhuizen? Als u binnen ons werkgebied blijft, hoeft u niets te doen. Verhuist u naar een ander gebied? Dan moet u een nieuwe huisarts zoeken.`,
+    questions: [
+      {
+        id: "huisarts-1",
+        question: "Amir wil vanmiddag om 14.00 uur een afspraak maken bij de huisarts. Hoe kan hij dat doen?",
+        options: [
+          "Door te bellen",
+          "Door naar de praktijk te gaan",
+          "Via de website",
+          "Door een e-mail te sturen",
+        ],
+        correctIndex: 2,
+        topic: "detailvragen",
+      },
+      {
+        id: "huisarts-2",
+        question: "Wanneer kan Amir zijn herhaalrecept ophalen?",
+        options: [
+          "Dezelfde dag",
+          "De volgende dag",
+          "Na twee werkdagen",
+          "Na een week",
+        ],
+        correctIndex: 2,
+        topic: "detailvragen",
+      },
+    ],
+  },
+  {
+    id: "fietsreparatie",
+    title: "Fietsenmaker Van Dijk",
+    situation: "In de buurt van Ahmed hangt een flyer van een fietsenmaker.",
+    text: `Fietsenmaker Van Dijk – Uw fiets in goede handen!
+
+Hebt u een lekke band? Of werken uw remmen niet goed? Breng uw fiets naar ons! Wij repareren alle soorten fietsen: gewone fietsen, elektrische fietsen en bakfietsen.
+
+Openingstijden:
+Maandag t/m zaterdag: 9.00 – 18.00 uur
+Donderdag: 9.00 – 21.00 uur (koopavond)
+Zondag: gesloten
+
+Kleine reparaties (bijvoorbeeld een lekke band of kapot licht) doen wij terwijl u wacht. U hoeft geen afspraak te maken. Voor grote reparaties moet u uw fiets bij ons achterlaten. U kunt uw fiets de volgende dag ophalen.
+
+Prijzen:
+Band plakken: € 12,50
+Nieuwe band: € 25,- (inclusief montage)
+Remmen afstellen: € 15,-
+Grote beurt: € 49,95
+
+Heeft u een elektrische fiets? Wij kunnen ook de accu controleren. Dit kost € 20,-.
+
+Adres: Kerkstraat 12, Utrecht
+Telefoon: 030-9876543
+
+Tip: Breng uw fiets in de winter voor een grote beurt. Dan is het minder druk en kunt u sneller terecht!`,
+    questions: [
+      {
+        id: "fiets-1",
+        question: "Ahmed heeft op woensdag een lekke band. Wat moet hij doen?",
+        options: [
+          "Een afspraak maken",
+          "De fiets achterlaten tot de volgende dag",
+          "Naar de fietsenmaker gaan en wachten",
+          "Bellen voor een afspraak",
+        ],
+        correctIndex: 2,
+        topic: "detailvragen",
+      },
+      {
+        id: "fiets-2",
+        question: "Hoeveel moet Ahmed betalen als hij zijn band wil laten plakken?",
+        options: ["€ 12,50", "€ 15,-", "€ 25,-", "€ 49,95"],
+        correctIndex: 0,
+        topic: "tabellen-en-schema",
+      },
+    ],
+  },
+  {
+    id: "bibliotheek",
+    title: "Bibliotheek Centrum",
+    situation: "Maria wil lid worden van de bibliotheek. Ze leest de informatie op de website.",
+    text: `Bibliotheek Centrum – Word lid!
+
+Bij de Bibliotheek Centrum kunt u boeken, tijdschriften en dvd's lenen. U kunt ook gratis gebruikmaken van de computers en het wifi.
+
+Lid worden
+U kunt lid worden in de bibliotheek of via onze website. Neem uw identiteitsbewijs mee. Een jaarabonnement kost € 42,- voor volwassenen. Kinderen tot 18 jaar zijn gratis lid.
+
+Boeken lenen
+U mag maximaal 10 boeken tegelijk lenen. U kunt de boeken 3 weken houden. Daarna kunt u de boeken nog één keer verlengen via de website. Bent u te laat met terugbrengen? Dan betaalt u € 0,30 per boek per dag.
+
+Activiteiten
+Elke woensdag is er een voorleesuurtje voor kinderen van 4 tot 8 jaar. Op donderdag is er een taalcafé voor mensen die Nederlands willen oefenen. Dit is gratis voor iedereen.
+
+Openingstijden:
+Maandag: gesloten
+Dinsdag t/m vrijdag: 10.00 – 20.00 uur
+Zaterdag: 10.00 – 17.00 uur
+Zondag: gesloten`,
+    questions: [
+      {
+        id: "bib-1",
+        question: "Maria heeft twee kinderen van 6 en 10 jaar. Hoeveel betaalt ze voor een jaarabonnement voor het hele gezin?",
+        options: ["€ 42,-", "€ 84,-", "€ 126,-", "Gratis"],
+        correctIndex: 0,
+        topic: "conclusies-trekken",
+      },
+      {
+        id: "bib-2",
+        question: "Maria wil Nederlands oefenen bij de bibliotheek. Wanneer kan ze dat doen?",
+        options: ["Op woensdag", "Op donderdag", "Op zaterdag", "Elke dag"],
+        correctIndex: 1,
+        topic: "detailvragen",
+      },
+    ],
+  },
+  {
+    id: "zwembad",
+    title: "Zwembad De Waterpret",
+    situation: "In het gemeentehuis ligt een folder over het zwembad.",
+    text: `Zwembad De Waterpret
+
+Ons zwembad is er voor iedereen! Of u nu wilt zwemmen voor uw gezondheid, voor de lol, of om te leren zwemmen – bij ons bent u welkom.
+
+Openingstijden:
+Maandag t/m vrijdag: 7.00 – 21.00 uur
+Zaterdag en zondag: 9.00 – 18.00 uur
+
+Prijzen:
+Volwassenen: € 5,50 per keer
+Kinderen (4-12 jaar): € 3,50 per keer
+10-rittenkaart volwassenen: € 44,- (u bespaart € 11,-)
+10-rittenkaart kinderen: € 28,- (u bespaart € 7,-)
+
+Zwemlessen
+Wij geven zwemlessen aan kinderen vanaf 5 jaar. De lessen zijn op woensdag en zaterdag. Een cursus van 20 lessen kost € 150,-. Aanmelden kan bij de receptie of via de website.
+
+Regels:
+- U moet een badmuts dragen
+- Kinderen onder 6 jaar moeten een volwassene meenemen
+- Eten en drinken zijn niet toegestaan bij het zwembad
+- Na het zwemmen moet u douchen
+
+Wij hebben ook een sauna. De sauna is alleen voor volwassenen (18+). Toegang tot de sauna kost € 12,50.`,
+    questions: [
+      {
+        id: "zwembad-1",
+        question: "Fatma koopt een 10-rittenkaart voor haar dochter van 8 jaar. Hoeveel betaalt ze per keer?",
+        options: ["€ 2,80", "€ 3,50", "€ 4,40", "€ 5,50"],
+        correctIndex: 0,
+        topic: "tabellen-en-schema",
+      },
+      {
+        id: "zwembad-2",
+        question: "De zoon van Fatma is 4 jaar. Mag hij alleen naar het zwembad?",
+        options: [
+          "Ja, als hij kan zwemmen",
+          "Ja, als hij een badmuts draagt",
+          "Nee, hij moet een volwassene meenemen",
+          "Nee, hij is te jong voor het zwembad",
+        ],
+        correctIndex: 2,
+        topic: "conclusies-trekken",
+      },
+    ],
+  },
+  {
+    id: "cursus-computer",
+    title: "Computercursus voor beginners",
+    situation: "Bij het buurtcentrum hangt een poster over een computercursus.",
+    text: `Computercursus voor beginners
+
+Kunt u niet goed overweg met de computer? Geen probleem! Bij Buurtcentrum De Hoek kunt u een computercursus voor beginners volgen.
+
+Wat leert u?
+- De computer aanzetten en uitzetten
+- Werken met internet en e-mail
+- Documenten maken en opslaan
+- Veilig internetten
+
+De cursus is in het Nederlands. U hoeft geen ervaring met computers te hebben.
+
+Wanneer?
+De cursus begint op maandag 3 maart en duurt 8 weken. Elke maandag van 10.00 tot 12.00 uur.
+
+Kosten?
+De cursus kost € 40,-. Bent u ouder dan 65 jaar? Dan is de cursus gratis. Studenten betalen € 20,-.
+
+Aanmelden
+U kunt zich aanmelden bij de receptie van het buurtcentrum. Aanmelden via internet of telefoon is niet mogelijk. Neem uw identiteitsbewijs mee. Er is plaats voor maximaal 12 deelnemers. Vol is vol!
+
+Adres: Pleinstraat 8, Amsterdam
+Vragen? Kom langs bij de receptie.`,
+    questions: [
+      {
+        id: "comp-1",
+        question: "Karima is 70 jaar oud en wil de computercursus volgen. Hoeveel betaalt zij?",
+        options: ["€ 40,-", "€ 20,-", "Niets, het is gratis", "€ 10,-"],
+        correctIndex: 2,
+        topic: "detailvragen",
+      },
+      {
+        id: "comp-2",
+        question: "Hoe kan Karima zich aanmelden voor de cursus?",
+        options: [
+          "Via internet",
+          "Door te bellen",
+          "Door langs te gaan bij de receptie",
+          "Door een e-mail te sturen",
+        ],
+        correctIndex: 2,
+        topic: "detailvragen",
       },
     ],
   },
 ];
+
+// Helper to get exactly 25 questions for the exam simulation
+export function getExamQuestions(): { text: LezenText; question: LezenQuestion; globalIndex: number }[] {
+  const allQuestions: { text: LezenText; question: LezenQuestion; globalIndex: number }[] = [];
+  let idx = 0;
+  for (const text of lezenTexts) {
+    for (const question of text.questions) {
+      allQuestions.push({ text, question, globalIndex: idx });
+      idx++;
+    }
+  }
+  // Return first 25 questions
+  return allQuestions.slice(0, 25);
+}
+
+// Topic-based improvement suggestions
+export const topicSuggestions: Record<string, { title: string; tip: string }> = {
+  "detailvragen": {
+    title: "Detailvragen (Detail Questions)",
+    tip: "Lees de tekst zorgvuldig en zoek naar specifieke informatie zoals tijden, namen en plaatsen. Onderstreep de kernwoorden in de vraag en zoek die terug in de tekst.",
+  },
+  "hoofdgedachte": {
+    title: "Hoofdgedachte (Main Idea)",
+    tip: "Lees eerst de hele tekst door voordat je de vraag beantwoordt. Vraag jezelf af: 'Waar gaat deze tekst over?' en 'Wat is het belangrijkste doel van de schrijver?'",
+  },
+  "conclusies-trekken": {
+    title: "Conclusies Trekken (Drawing Conclusions)",
+    tip: "Soms staat het antwoord niet letterlijk in de tekst. Combineer informatie uit verschillende delen van de tekst om tot het juiste antwoord te komen.",
+  },
+  "samenvatten": {
+    title: "Samenvatten (Summarizing)",
+    tip: "Oefen met het in je eigen woorden navertellen van een tekst. Focus op de belangrijkste punten, niet op details.",
+  },
+  "tabellen-en-schema": {
+    title: "Tabellen & Schema's (Tables & Charts)",
+    tip: "Lees de kolom- en rijkoppen van tabellen goed. Let op voorwaarden (gewicht, verdieping, leeftijd) die bepalen welk tarief geldt.",
+  },
+  "leesstrategie": {
+    title: "Leesstrategie (Reading Strategy)",
+    tip: "Begin altijd met het lezen van de situatie en de vragen voordat je de tekst leest. Zo weet je waar je op moet letten.",
+  },
+};
