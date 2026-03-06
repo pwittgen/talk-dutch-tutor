@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Mic, BookOpen, Headphones, PenLine, Lock } from "lucide-react";
 import LezenQuiz from "@/components/LezenQuiz";
+import LuisterenQuiz from "@/components/LuisterenQuiz";
 
-type ExamSection = "hub" | "lezen";
+type ExamSection = "hub" | "lezen" | "luisteren";
 
 const examCategories = [
   {
@@ -35,8 +36,8 @@ const examCategories = [
     emoji: "👂",
     icon: Headphones,
     description: "Luister naar gesprekken en beantwoord vragen",
-    available: false,
-    stats: { questions: 25 },
+    available: true,
+    stats: { questions: 24, time: "45 min" },
   },
   {
     id: "schrijven" as const,
@@ -56,6 +57,10 @@ const ExamHubPage = () => {
 
   if (activeSection === "lezen") {
     return <LezenQuiz onBack={() => setActiveSection("hub")} />;
+  }
+
+  if (activeSection === "luisteren") {
+    return <LuisterenQuiz onBack={() => setActiveSection("hub")} />;
   }
 
   return (
