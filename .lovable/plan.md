@@ -1,33 +1,33 @@
 
 
-## Repurpose "Part of Speech" as "English Translation" (of example sentence)
+## Analysis
 
-The `part_of_speech` database column will be reused to store the English translation of the example sentence. No DB migration needed — just relabel it in the UI.
+Two issues found in the logs and code:
 
-### Changes
+### Issue 1: Speech Recognition loses gesture context
+In `startListening`, the `warmupAndStart` async function does `await ensureMicStream()` before calling `createAndStart()`. On mobile Safari, after an `await`, the user gesture context is lost. This means `recognition.start()` runs outside a trusted gesture, causing Safari to silently fail to capture audio. This explains why the mic "starts" (green indicators) but captures nothing (`submit-empty`).
 
-**1. Admin Word Form (`src/pages/AdminVocabPage.tsx`)**
-- Line 220: Change badge display from `part_of_speech` label (no visual change needed, just context)
-- Line 276: Change placeholder from "Part of speech (optional)" to "English translation of example (optional)"
+### Issue 2: TTS not playing on next turn
+The auto-play effect (line 149) fires `speakDutch()` inside a `setTimeout` within `useEffect`. This is not a user gesture context, so Safari blocks audio playback on turn transitions.
 
-**2. Import Dialog (`src/components/VocabImportDialog.tsx`)**
-- Line 139: Update description text — column D is now "English translation of example"
-- Line 184: Change table header from "POS" to "Translation"
+## Plan
 
-**3. Flashcard Back (`src/components/FlashcardDeck.tsx`)**
-- Map `part_of_speech` from DB into a new field (e.g. `exampleTranslation`) in `LearnCategoryPage.tsx`
-- On the back of the flashcard, below the example sentence, display the English translation if available
+### 1. Fix gesture context in `useSpeechRecognition.ts`
 
-**4. LearnCategoryPage (`src/pages/LearnCategoryPage.tsx`)**
-- Update the `VocabWord` mapping to pass `part_of_speech` as `exampleTranslation`
+Restructure `startListening` so that `recognition.start()` is called **synchronously** from the click handler, not after an `await`:
 
-**5. VocabWord type (`src/data/vocabData.ts`)**
-- Add optional `exampleTranslation?: string` field to the `VocabWord` interface
+- Track whether mic permission has been acquired at least once (`micAcquiredRef`)
+- On first call: `await getUserMedia` then `createAndStart()` (user expects a brief delay)
+- On subsequent calls: call `createAndStart()` **immediately** (synchronously), and refresh the `getUserMedia` stream in the background (fire-and-forget) — this preserves the gesture context chain
+- This ensures Safari's audio pipeline is activated by the trusted gesture
 
-### Files touched
-- `src/data/vocabData.ts` — add `exampleTranslation` to interface
-- `src/pages/LearnCategoryPage.tsx` — map `part_of_speech` → `exampleTranslation`
-- `src/components/FlashcardDeck.tsx` — show translation on card back
-- `src/pages/AdminVocabPage.tsx` — relabel placeholder
-- `src/components/VocabImportDialog.tsx` — relabel column header and description
+### 2. Fix TTS playback on turn change in `ConversationView.tsx`
+
+- In `handleNext`, call `speakDutch()` directly after setting the next turn (within the click handler's gesture context), instead of relying on the `useEffect` + `setTimeout`
+- Keep the `useEffect` only for the initial mount/first turn
+- This ensures Safari allows audio playback since it's triggered from a user gesture
+
+### 3. Clean up cancel flow
+
+- Ensure `cancelListening` resets all refs properly so the next `startListening` works cleanly
 

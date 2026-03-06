@@ -273,7 +273,7 @@ const WordForm = ({ word, onChange, onSave, onCancel, saving }: {
       <Input placeholder="English" value={word.english || ""} onChange={(e) => onChange({ ...word, english: e.target.value })} />
     </div>
     <Input placeholder="Example sentence (optional)" value={word.example_sentence || ""} onChange={(e) => onChange({ ...word, example_sentence: e.target.value })} />
-    <Input placeholder="Part of speech (optional)" value={word.part_of_speech || ""} onChange={(e) => onChange({ ...word, part_of_speech: e.target.value })} />
+    <Input placeholder="English translation of example (optional)" value={word.part_of_speech || ""} onChange={(e) => onChange({ ...word, part_of_speech: e.target.value })} />
     <div className="flex gap-2 justify-end">
       <Button variant="ghost" size="sm" onClick={onCancel}><X className="h-4 w-4 mr-1" /> Cancel</Button>
       <Button size="sm" onClick={onSave} disabled={saving}><Save className="h-4 w-4 mr-1" /> Save</Button>

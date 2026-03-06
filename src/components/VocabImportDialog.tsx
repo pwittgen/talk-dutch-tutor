@@ -136,7 +136,7 @@ const VocabImportDialog = ({
           </DialogTitle>
           <DialogDescription>
             Upload a CSV or Excel file. Columns: Dutch, English, Example
-            sentence (optional), Part of speech (optional).
+            sentence (optional), English translation of example (optional).
           </DialogDescription>
         </DialogHeader>
 
@@ -180,7 +180,7 @@ const VocabImportDialog = ({
                     <TableHead>Dutch</TableHead>
                     <TableHead>English</TableHead>
                     <TableHead>Example</TableHead>
-                    <TableHead>POS</TableHead>
+                    <TableHead>Translation</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
