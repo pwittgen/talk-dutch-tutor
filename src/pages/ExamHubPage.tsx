@@ -4,8 +4,9 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Mic, BookOpen, Headphones, PenLine, Lock } from "lucide-react";
 import LezenQuiz from "@/components/LezenQuiz";
 import LuisterenQuiz from "@/components/LuisterenQuiz";
+import SchrijvenQuiz from "@/components/SchrijvenQuiz";
 
-type ExamSection = "hub" | "lezen" | "luisteren";
+type ExamSection = "hub" | "lezen" | "luisteren" | "schrijven";
 
 const examCategories = [
   {
