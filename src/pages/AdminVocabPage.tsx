@@ -10,6 +10,7 @@ import { ArrowLeft, Plus, Pencil, Trash2, ChevronRight, Save, X } from "lucide-r
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import type { DbVocabTheme, DbVocabWord } from "@/hooks/useVocabThemes";
+import VocabImportDialog from "@/components/VocabImportDialog";
 
 const AdminVocabPage = () => {
   const navigate = useNavigate();
