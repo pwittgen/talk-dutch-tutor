@@ -6,10 +6,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Plus, Pencil, Trash2, ChevronRight, Save, X } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, ChevronRight, Save, X, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import type { DbVocabTheme, DbVocabWord } from "@/hooks/useVocabThemes";
+import VocabImportDialog from "@/components/VocabImportDialog";
 
 const AdminVocabPage = () => {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ const AdminVocabPage = () => {
   const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
   const [editingTheme, setEditingTheme] = useState<Partial<DbVocabTheme> | null>(null);
   const [editingWord, setEditingWord] = useState<Partial<DbVocabWord> | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const { data: themes = [], isLoading: themesLoading } = useQuery({
     queryKey: ["admin-themes"],
@@ -189,9 +191,14 @@ const AdminVocabPage = () => {
             {/* Word list */}
             <div className="flex items-center justify-between">
               <h2 className="font-display text-xl font-bold text-foreground">Words ({words.length})</h2>
-              <Button size="sm" onClick={() => setEditingWord({ dutch: "", english: "", example_sentence: "", part_of_speech: "", sort_order: words.length })}>
-                <Plus className="h-4 w-4 mr-1" /> Add Word
-              </Button>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+                  <Upload className="h-4 w-4 mr-1" /> Import
+                </Button>
+                <Button size="sm" onClick={() => setEditingWord({ dutch: "", english: "", example_sentence: "", part_of_speech: "", sort_order: words.length })}>
+                  <Plus className="h-4 w-4 mr-1" /> Add Word
+                </Button>
+              </div>
             </div>
 
             {editingWord && !editingWord.id && (
@@ -218,6 +225,13 @@ const AdminVocabPage = () => {
                 </motion.div>
               )
             ))}
+            <VocabImportDialog
+              themeId={selectedTheme!}
+              themeName={currentTheme?.name || ""}
+              existingWordCount={words.length}
+              open={importOpen}
+              onOpenChange={setImportOpen}
+            />
           </>
         )}
       </div>
