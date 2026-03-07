@@ -535,7 +535,7 @@ export const scenarios: Scenario[] = [
     conversations: [
       {
         speaker: "dutch",
-        dutchText: "Hé, hallo! Leuk weer vandaag, hè? Wat ga je vandaag doen?",
+        dutchText: "Hé, hallo! Lekker weer vandaag, hè? Wat ga je vandaag doen?",
         englishHint: "A friendly stranger is chatting about the weather. Respond naturally!",
         imageUrl: randomEncounterImg,
         imageDescription: "A lively Dutch city street with people walking, a bicycle by a canal, and a friendly person waving.",
