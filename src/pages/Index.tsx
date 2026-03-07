@@ -120,17 +120,14 @@ const Index = () => {
 
       {/* Hero — editorial two-column spread */}
       <section className="border-b border-sand">
-        <div className="mx-auto max-w-5xl px-6 py-20 lg:py-28 grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+        <div className="mx-auto max-w-5xl px-6 py-20 lg:py-28">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <span className="font-mono text-xs tracking-[0.18em] uppercase text-warm-grey mb-6 block">
-              Dutch A1–A2 · Inburgering
-            </span>
-            <h1 className="font-display text-5xl lg:text-6xl font-black text-ink leading-[1.1] tracking-tight mb-6">
-              Praat maar.
+            <h1>
+              <PraatMaarLogo maarSize="72px" variant="light" className="mb-6 lg:mb-8" />
             </h1>
             <p className="font-sans text-lg text-warm-grey leading-relaxed mb-8 max-w-sm">
               A quiet space to practice Dutch, guided by AI. Conversations,
@@ -144,19 +141,6 @@ const Index = () => {
                 Start practicing
               </button>
             )}
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.7, delay: 0.1 }}
-            className="relative"
-          >
-            <img
-              src={heroImage}
-              alt="Dutch canal scene with windmill and tulips"
-              className="w-full aspect-[4/3] object-cover rounded"
-            />
           </motion.div>
         </div>
       </section>
