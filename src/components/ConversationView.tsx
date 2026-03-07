@@ -107,6 +107,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
 
   const speakDutch = useCallback((text?: string) => {
     if (muted) return;
+    ttsInitiatedRef.current = true;
     if (currentAudioRef.current) {
       currentAudioRef.current.pause();
       currentAudioRef.current = null;
