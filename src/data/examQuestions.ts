@@ -15,6 +15,7 @@ export interface ExamQuestion {
   keywords: string[];
   category: "beschrijven" | "mening" | "situatie";
   videoDescription?: string;
+  videoThumbnailPrompt?: string;
 }
 
 export const opgaveDescriptions: Record<number, { title: string; instruction: string; type: OpgaveType }> = {
@@ -49,6 +50,7 @@ export const examQuestions: ExamQuestion[] = [
   {
     id: 1, opgave: 1, opgaveType: "video", imagePrompts: [], placeholderDescriptions: [],
     videoDescription: "Een man loopt in een winkelstraat. Hij gaat een schoenenwinkel binnen. Hij past schoenen en koopt ze.",
+    videoThumbnailPrompt: "A Dutch man sitting in a shoe shop trying on shoes, a shop assistant hands over a shoe box, realistic photo, warm shop lighting",
     situationDutch: "U ziet een filmpje over een man in een winkel.",
     situationEnglish: "You see a video about a man in a shop.",
     dutchQuestion: "Wat doet de man in het filmpje?",
@@ -61,6 +63,7 @@ export const examQuestions: ExamQuestion[] = [
   {
     id: 2, opgave: 1, opgaveType: "video", imagePrompts: [], placeholderDescriptions: [],
     videoDescription: "Een vrouw gaat naar de markt. Ze koopt groente en fruit. Ze betaalt met contant geld.",
+    videoThumbnailPrompt: "A Dutch woman at a vibrant outdoor market buying fresh vegetables and fruit, paying with cash at a stall, realistic photo, natural daylight",
     situationDutch: "U ziet een filmpje over een vrouw op de markt.",
     situationEnglish: "You see a video about a woman at the market.",
     dutchQuestion: "Wat koopt de vrouw op de markt?",
@@ -73,6 +76,7 @@ export const examQuestions: ExamQuestion[] = [
   {
     id: 3, opgave: 1, opgaveType: "video", imagePrompts: [], placeholderDescriptions: [],
     videoDescription: "Een gezin zit aan tafel. Ze eten pannenkoeken. De kinderen lachen.",
+    videoThumbnailPrompt: "A happy Dutch family eating pancakes together at a cosy dining table, children laughing, warm home atmosphere, realistic photo",
     situationDutch: "U ziet een filmpje over een gezin dat eet.",
     situationEnglish: "You see a video about a family eating.",
     dutchQuestion: "Wat eten ze? En hoe is de sfeer?",
@@ -85,6 +89,7 @@ export const examQuestions: ExamQuestion[] = [
   {
     id: 4, opgave: 1, opgaveType: "video", imagePrompts: [], placeholderDescriptions: [],
     videoDescription: "Een man fietst naar zijn werk. Het regent. Hij draagt een regenjas.",
+    videoThumbnailPrompt: "A Dutch man cycling to work in the rain on a Dutch bike path wearing a yellow raincoat, wet streets, realistic photo",
     situationDutch: "U ziet een filmpje over een man die naar zijn werk gaat.",
     situationEnglish: "You see a video about a man going to work.",
     dutchQuestion: "Hoe gaat de man naar zijn werk? En hoe is het weer?",
@@ -293,6 +298,7 @@ export const examQuestions: ExamQuestion[] = [
   {
     id: 17, opgave: 1, opgaveType: "video", imagePrompts: [], placeholderDescriptions: [],
     videoDescription: "Een vrouw doet sport in een sportschool. Ze loopt op een loopband. Daarna drinkt ze water.",
+    videoThumbnailPrompt: "A Dutch woman running on a treadmill in a modern gym, bright lighting, sports clothes, realistic photo",
     situationDutch: "U ziet een filmpje over een vrouw in de sportschool.",
     situationEnglish: "You see a video about a woman at the gym.",
     dutchQuestion: "Wat doet de vrouw in het filmpje?",
@@ -305,6 +311,7 @@ export const examQuestions: ExamQuestion[] = [
   {
     id: 18, opgave: 1, opgaveType: "video", imagePrompts: [], placeholderDescriptions: [],
     videoDescription: "Een man gaat naar de apotheek. Hij geeft zijn recept af. Hij krijgt medicijnen mee.",
+    videoThumbnailPrompt: "A Dutch man handing a prescription to a pharmacist at a pharmacy counter, medicine shelves in background, realistic photo",
     situationDutch: "U ziet een filmpje over een man bij de apotheek.",
     situationEnglish: "You see a video about a man at the pharmacy.",
     dutchQuestion: "Wat doet de man in het filmpje?",
@@ -317,6 +324,7 @@ export const examQuestions: ExamQuestion[] = [
   {
     id: 19, opgave: 1, opgaveType: "video", imagePrompts: [], placeholderDescriptions: [],
     videoDescription: "Een moeder brengt haar kind naar school. Ze praat met de juf. Dan gaat de moeder weg.",
+    videoThumbnailPrompt: "A Dutch mother talking to a primary school teacher at the school entrance while her child waves goodbye, realistic photo, morning light",
     situationDutch: "U ziet een filmpje over een moeder en haar kind bij de school.",
     situationEnglish: "You see a video about a mother and her child at school.",
     dutchQuestion: "Wat doet de moeder in het filmpje?",
@@ -329,6 +337,7 @@ export const examQuestions: ExamQuestion[] = [
   {
     id: 20, opgave: 1, opgaveType: "video", imagePrompts: [], placeholderDescriptions: [],
     videoDescription: "Een gezin viert een verjaardag. Er is een taart. Ze zingen een liedje. Iedereen is blij.",
+    videoThumbnailPrompt: "A Dutch family celebrating a birthday around a table with a lit birthday cake, everyone singing and smiling, cosy living room, realistic photo",
     situationDutch: "U ziet een filmpje over een verjaardag.",
     situationEnglish: "You see a video about a birthday party.",
     dutchQuestion: "Wat doen ze in het filmpje? En hoe is de sfeer?",
@@ -537,6 +546,7 @@ export const examQuestions: ExamQuestion[] = [
   {
     id: 33, opgave: 1, opgaveType: "video", imagePrompts: [], placeholderDescriptions: [],
     videoDescription: "Een man gaat naar het gemeentehuis. Hij vraagt om een formulier. De medewerker helpt hem.",
+    videoThumbnailPrompt: "A Dutch man at a municipality office (gemeentehuis) counter asking a government employee for a form, official Dutch building interior, realistic photo",
     situationDutch: "U ziet een filmpje over een man bij het gemeentehuis.",
     situationEnglish: "You see a video about a man at the municipality office.",
     dutchQuestion: "Wat doet de man in het filmpje?",
@@ -549,6 +559,7 @@ export const examQuestions: ExamQuestion[] = [
   {
     id: 34, opgave: 1, opgaveType: "video", imagePrompts: [], placeholderDescriptions: [],
     videoDescription: "Een vrouw volgt een inburgeringscursus. Ze luistert naar de leraar. Ze schrijft woorden op.",
+    videoThumbnailPrompt: "A woman attending a Dutch civic integration language course in a classroom, writing notes while listening to a teacher at a whiteboard, realistic photo",
     situationDutch: "U ziet een filmpje over een vrouw in een cursus.",
     situationEnglish: "You see a video about a woman in a civic integration course.",
     dutchQuestion: "Wat doet de vrouw in het filmpje?",
@@ -561,6 +572,7 @@ export const examQuestions: ExamQuestion[] = [
   {
     id: 35, opgave: 1, opgaveType: "video", imagePrompts: [], placeholderDescriptions: [],
     videoDescription: "Een man doet vrijwilligerswerk in een buurthuis. Hij helpt ouderen met computerproblemen.",
+    videoThumbnailPrompt: "A man doing volunteer work at a Dutch community centre (buurthuis), patiently helping an elderly person use a computer, realistic photo, friendly atmosphere",
     situationDutch: "U ziet een filmpje over een man in een buurthuis.",
     situationEnglish: "You see a video about a man in a community centre.",
     dutchQuestion: "Wat doet de man in het filmpje? En voor wie?",
@@ -573,6 +585,7 @@ export const examQuestions: ExamQuestion[] = [
   {
     id: 36, opgave: 1, opgaveType: "video", imagePrompts: [], placeholderDescriptions: [],
     videoDescription: "Een gezin maakt een wandeling in een Nederlands bos. De kinderen spelen. De ouders praten.",
+    videoThumbnailPrompt: "A Dutch family walking through a lush green Dutch forest, children playing among the trees while parents chat and walk, realistic photo, autumn light",
     situationDutch: "U ziet een filmpje over een gezin in het bos.",
     situationEnglish: "You see a video about a family walking in the forest.",
     dutchQuestion: "Wat doet het gezin? En wat doen de kinderen?",
@@ -781,6 +794,7 @@ export const examQuestions: ExamQuestion[] = [
   {
     id: 49, opgave: 1, opgaveType: "video", imagePrompts: [], placeholderDescriptions: [],
     videoDescription: "Een vrouw heeft een sollicitatiegesprek. Ze zit aan tafel. Ze vertelt over haar werkervaring.",
+    videoThumbnailPrompt: "A Dutch woman in a professional job interview, sitting across a desk from an interviewer in a modern office, speaking confidently, realistic photo",
     situationDutch: "U ziet een filmpje over een vrouw bij een sollicitatiegesprek.",
     situationEnglish: "You see a video about a woman at a job interview.",
     dutchQuestion: "Wat doet de vrouw in het filmpje?",
@@ -793,6 +807,7 @@ export const examQuestions: ExamQuestion[] = [
   {
     id: 50, opgave: 1, opgaveType: "video", imagePrompts: [], placeholderDescriptions: [],
     videoDescription: "Een man betaalt zijn rekeningen online. Hij kijkt naar de bedragen. Hij is tevreden.",
+    videoThumbnailPrompt: "A Dutch man at home paying bills online on a laptop, looking satisfied at the screen, cosy home interior, realistic photo",
     situationDutch: "U ziet een filmpje over een man die rekeningen betaalt.",
     situationEnglish: "You see a video about a man paying bills.",
     dutchQuestion: "Wat doet de man in het filmpje?",
@@ -805,6 +820,7 @@ export const examQuestions: ExamQuestion[] = [
   {
     id: 51, opgave: 1, opgaveType: "video", imagePrompts: [], placeholderDescriptions: [],
     videoDescription: "Kinderen doen huiswerk aan tafel. Een ouder helpt hen. Daarna mogen ze buiten spelen.",
+    videoThumbnailPrompt: "Dutch children doing homework at a kitchen table with a parent helping them, school books and pencils on the table, realistic photo, warm home atmosphere",
     situationDutch: "U ziet een filmpje over kinderen die huiswerk maken.",
     situationEnglish: "You see a video about children doing homework.",
     dutchQuestion: "Wat doen de kinderen? En wat doet de ouder?",
@@ -817,6 +833,7 @@ export const examQuestions: ExamQuestion[] = [
   {
     id: 52, opgave: 1, opgaveType: "video", imagePrompts: [], placeholderDescriptions: [],
     videoDescription: "Een man gaat naar de tandarts. Hij wacht in de wachtkamer. De tandarts onderzoekt zijn tanden.",
+    videoThumbnailPrompt: "A Dutch man in a dentist's chair having his teeth examined by a dentist in a clean modern dental practice, realistic photo",
     situationDutch: "U ziet een filmpje over een man bij de tandarts.",
     situationEnglish: "You see a video about a man at the dentist.",
     dutchQuestion: "Wat doet de man in het filmpje?",
