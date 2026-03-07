@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Mic, BookOpen, Headphones, PenLine, Lock } from "lucide-react";
 import LezenQuiz from "@/components/LezenQuiz";
@@ -54,7 +54,9 @@ const examCategories = [
 
 const ExamHubPage = () => {
   const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState<ExamSection>("hub");
+  const location = useLocation();
+  const initialSection = (location.state as { section?: ExamSection } | null)?.section ?? "hub";
+  const [activeSection, setActiveSection] = useState<ExamSection>(initialSection);
 
   if (activeSection === "lezen") {
     return <LezenQuiz onBack={() => setActiveSection("hub")} />;
