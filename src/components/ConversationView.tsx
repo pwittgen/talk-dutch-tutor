@@ -217,8 +217,13 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     }
     // Don't enable mic if TTS was initiated but hasn't started playing yet
     // (i.e. still fetching audio). Wait for isSpeaking to go true first.
+    // Safety: if TTS silently fails (no isSpeaking change), enable after 5s.
     if (ttsInitiatedRef.current && !ttsHasPlayedRef.current) {
-      return;
+      const safety = setTimeout(() => {
+        ttsHasPlayedRef.current = true;
+        setMicEnabled(true);
+      }, 5000);
+      return () => clearTimeout(safety);
     }
     const t = setTimeout(() => setMicEnabled(true), 400);
     return () => clearTimeout(t);
