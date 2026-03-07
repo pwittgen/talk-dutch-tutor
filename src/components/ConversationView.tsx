@@ -62,6 +62,10 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
 
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [micEnabled, setMicEnabled] = useState(false);
+  // Track whether TTS has been initiated for the current turn.
+  // Prevents mic from enabling before TTS has had a chance to start playing.
+  const ttsInitiatedRef = useRef(false);
+  const ttsHasPlayedRef = useRef(false);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const preloadedAudioRef = useRef<{ text: string; blobUrl: string } | null>(null);
   // Holds an Audio element activated synchronously from a gesture, for use after an async gap
