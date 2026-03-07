@@ -9,6 +9,7 @@ import VocabCategoryCard from "@/components/VocabCategoryCard";
 import SectionTabs, { type SectionId } from "@/components/SectionTabs";
 import { useAuth } from "@/hooks/useAuth";
 import heroImage from "@/assets/hero-dutch.jpg";
+import PraatMaarLogo from "@/components/PraatMaarLogo";
 
 const examCategories = [
   {
@@ -69,9 +70,7 @@ const Index = () => {
       {/* Header */}
       <header className="border-b border-border bg-background">
         <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between">
-          <span className="font-display text-xl font-semibold text-foreground tracking-tight">
-            Talk Dutch
-          </span>
+          <PraatMaarLogo maarSize="22px" />
           <nav className="flex items-center gap-6">
             {user ? (
               <>
@@ -302,7 +301,7 @@ const Index = () => {
       {/* Footer */}
       <footer className="border-t border-border py-10">
         <div className="mx-auto max-w-6xl px-6 flex items-center justify-between">
-          <span className="font-display text-sm font-medium text-foreground">Talk Dutch</span>
+          <PraatMaarLogo maarSize="16px" />
           <p className="text-sm text-muted-foreground">
             Made with care for Dutch learners.
           </p>
