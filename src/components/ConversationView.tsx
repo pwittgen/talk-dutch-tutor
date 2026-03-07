@@ -202,6 +202,8 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
 
   // Enable mic only after TTS finishes (+ 400ms for OS audio session release).
   // When muted there is no TTS, so enable mic after a short delay instead.
+  // ttsHasPlayedRef prevents enabling during the async gap between speakDutch()
+  // being called and isSpeaking actually becoming true (fetch latency).
   useEffect(() => {
     if (muted) {
       const t = setTimeout(() => setMicEnabled(true), 200);
@@ -209,15 +211,23 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     }
     if (isSpeaking) {
       setMicEnabled(false);
+      ttsHasPlayedRef.current = true;
+      return;
+    }
+    // Don't enable mic if TTS was initiated but hasn't started playing yet
+    // (i.e. still fetching audio). Wait for isSpeaking to go true first.
+    if (ttsInitiatedRef.current && !ttsHasPlayedRef.current) {
       return;
     }
     const t = setTimeout(() => setMicEnabled(true), 400);
     return () => clearTimeout(t);
   }, [isSpeaking, muted]);
 
-  // Reset mic gate when advancing to a new turn
+  // Reset mic gate and TTS tracking when advancing to a new turn
   useEffect(() => {
     setMicEnabled(false);
+    ttsInitiatedRef.current = false;
+    ttsHasPlayedRef.current = false;
   }, [currentTurn]);
 
   const evaluateWithAI = useCallback(async (answer: string) => {
