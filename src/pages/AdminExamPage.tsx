@@ -153,7 +153,7 @@ const AdminExamPage = () => {
 
   const fetchImageRecords = useCallback(async () => {
     setImagesLoading(true);
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from("exam_question_images")
       .select("*")
       .order("question_id", { ascending: true })
@@ -202,7 +202,7 @@ const AdminExamPage = () => {
   // ── Images tab: actions ───────────────────────────────────────────────────
 
   const handleApprove = async (questionId: number, slot: number) => {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from("exam_question_images")
       .update({ status: "approved" })
       .eq("question_id", questionId)
@@ -221,7 +221,7 @@ const AdminExamPage = () => {
   };
 
   const handleReject = async (questionId: number, slot: number) => {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from("exam_question_images")
       .update({ status: "rejected" })
       .eq("question_id", questionId)
@@ -247,7 +247,7 @@ const AdminExamPage = () => {
         body: { prompt, questionId },
       });
       if (error || !data?.imageUrl) throw new Error(error?.message ?? "No image generated");
-      const { error: upsertError } = await supabase.from("exam_question_images").upsert(
+      const { error: upsertError } = await (supabase as any).from("exam_question_images").upsert(
         { question_id: questionId, image_slot: slot, prompt, image_url: data.imageUrl, status: "cached" },
         { onConflict: "question_id,image_slot" },
       );
@@ -283,13 +283,13 @@ const AdminExamPage = () => {
           body: { prompt: s.prompt, questionId: s.questionId },
         });
         if (error || !data?.imageUrl) throw new Error("Generation failed");
-        await supabase.from("exam_question_images").upsert(
+        await (supabase as any).from("exam_question_images").upsert(
           { question_id: s.questionId, image_slot: s.slot, prompt: s.prompt, image_url: data.imageUrl, status: "cached" },
           { onConflict: "question_id,image_slot" },
         );
         generated++;
       } catch {
-        await supabase.from("exam_question_images").upsert(
+        await (supabase as any).from("exam_question_images").upsert(
           { question_id: s.questionId, image_slot: s.slot, prompt: s.prompt, status: "rejected" },
           { onConflict: "question_id,image_slot" },
         );

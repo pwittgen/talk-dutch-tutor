@@ -52,7 +52,7 @@ const AuthPage = () => {
         className="w-full max-w-sm space-y-6"
       >
         <div>
-          <PraatMaarLogo maarSize="32px" className="mb-3" />
+          <PraatMaarLogo maarSize="32px" variant="light" className="mb-3" />
           <p className="font-sans text-warm-grey text-sm">
             {isLogin ? "Log in to continue learning" : "Create your account"}
           </p>

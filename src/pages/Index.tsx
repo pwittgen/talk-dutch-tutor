@@ -70,7 +70,7 @@ const Index = () => {
       {/* Header */}
       <header className="border-b border-sand bg-background sticky top-0 z-20">
         <div className="mx-auto max-w-5xl px-6 py-4 flex items-center justify-between">
-          <PraatMaarLogo maarSize="22px" />
+          <PraatMaarLogo maarSize="22px" variant="light" />
           <nav className="flex items-center gap-6">
             {user ? (
               <>
@@ -301,7 +301,7 @@ const Index = () => {
       {/* Footer */}
       <footer className="border-t border-sand/20 py-10 bg-ink text-cream">
         <div className="mx-auto max-w-5xl px-6 flex items-center justify-between">
-          <PraatMaarLogo maarSize="16px" cursorColor="#B8895A" />
+          <PraatMaarLogo maarSize="16px" variant="dark" />
           <p className="font-sans text-sm" style={{ color: "#6B6560" }}>
             Made with care for Dutch learners.
           </p>
