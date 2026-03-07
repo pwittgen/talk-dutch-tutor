@@ -65,7 +65,7 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
         .select("image_url")
         .eq("question_id", questionId)
         .eq("image_slot", imageSlot)
-        .eq("status", "cached")
+        .in("status", ["cached", "approved"])
         .maybeSingle();
 
       if (cached?.image_url) {
