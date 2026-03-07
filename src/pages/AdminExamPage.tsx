@@ -247,7 +247,7 @@ const AdminExamPage = () => {
         body: { prompt, questionId },
       });
       if (error || !data?.imageUrl) throw new Error(error?.message ?? "No image generated");
-      const { error: upsertError } = await supabase.from("exam_question_images").upsert(
+      const { error: upsertError } = await (supabase as any).from("exam_question_images").upsert(
         { question_id: questionId, image_slot: slot, prompt, image_url: data.imageUrl, status: "cached" },
         { onConflict: "question_id,image_slot" },
       );
