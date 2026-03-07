@@ -1,6 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, ArrowRight, ArrowLeft, Camera, Loader2, Star, BookOpen, ChevronDown, Keyboard, Volume2, Clock, Film } from "lucide-react";
+import {
+  Mic, MicOff, ArrowRight, ArrowLeft, Camera, Loader2,
+  Star, BookOpen, ChevronDown, Keyboard, Volume2, Clock,
+  Film, Play, Pause,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { type ExamQuestion, opgaveDescriptions } from "@/data/examQuestions";
@@ -29,9 +33,16 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
   const [textInput, setTextInput] = useState("");
   const [showHints, setShowHints] = useState(false);
   const [generatedImages, setGeneratedImages] = useState<Record<string, string>>({});
-  const [loadingImage, setLoadingImage] = useState<string | null>(null);
+  const [loadingImages, setLoadingImages] = useState<Record<string, boolean>>({});
   const [examElapsed, setExamElapsed] = useState(0);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [videoProgress, setVideoProgress] = useState(0);
+
   const examTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const videoTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Refs to track in-flight requests and generated images without stale closures
+  const inFlightRef = useRef<Set<string>>(new Set());
+  const generatedRef = useRef<Record<string, string>>({});
 
   const question = questions[currentIndex];
   const currentOpgave = question.opgave;
@@ -39,45 +50,93 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
 
   // Exam elapsed timer
   useEffect(() => {
-    examTimerRef.current = setInterval(() => {
-      setExamElapsed(prev => prev + 1);
-    }, 1000);
-    return () => {
-      if (examTimerRef.current) clearInterval(examTimerRef.current);
-    };
+    examTimerRef.current = setInterval(() => setExamElapsed(prev => prev + 1), 1000);
+    return () => { if (examTimerRef.current) clearInterval(examTimerRef.current); };
   }, []);
 
-
   const imageKey = (qId: number, idx: number) => `${qId}-${idx}`;
+  const videoThumbKey = (qId: number) => `${qId}-video-thumb`;
 
-  // Generate image for a question
-  const generateImage = useCallback(async (q: ExamQuestion, imgIndex: number) => {
-    const key = imageKey(q.id, imgIndex);
-    if (generatedImages[key]) return;
-    setLoadingImage(key);
+  // Concurrent-safe image generator — uses refs to avoid stale closures
+  const generateImageForKey = useCallback(async (key: string, prompt: string) => {
+    if (generatedRef.current[key] || inFlightRef.current.has(key)) return;
+    inFlightRef.current.add(key);
+    setLoadingImages(prev => ({ ...prev, [key]: true }));
     try {
       const response = await supabase.functions.invoke("generate-exam-image", {
-        body: { prompt: q.imagePrompts[imgIndex], questionId: q.id },
+        body: { prompt, questionId: parseInt(key.split("-")[0]) },
       });
-      if (response.error) {
-        // 402/429 come back as FunctionsHttpError — skip silently, show placeholder
-        console.warn("Image generation unavailable:", response.error);
-      } else if (response.data?.imageUrl) {
+      if (!response.error && response.data?.imageUrl) {
+        generatedRef.current[key] = response.data.imageUrl;
         setGeneratedImages(prev => ({ ...prev, [key]: response.data.imageUrl }));
       }
     } catch (e) {
-      console.warn("Image generation failed, using placeholder:", e);
+      console.warn("Image generation failed:", e);
     } finally {
-      setLoadingImage(null);
+      inFlightRef.current.delete(key);
+      setLoadingImages(prev => { const n = { ...prev }; delete n[key]; return n; });
     }
-  }, [generatedImages]);
+  }, []);
 
-  // Generate images for current question on mount/change
+  // Kick off image generation for a given question (photos + video thumbnail)
+  const generateForQuestion = useCallback((q: ExamQuestion) => {
+    q.imagePrompts.forEach((prompt, i) => generateImageForKey(imageKey(q.id, i), prompt));
+    if (q.opgaveType === "video" && q.videoThumbnailPrompt) {
+      generateImageForKey(videoThumbKey(q.id), q.videoThumbnailPrompt);
+    }
+  }, [generateImageForKey]);
+
+  // Auto-generate current question's images and pre-fetch next question
   useEffect(() => {
-    question.imagePrompts.forEach((_, i) => {
-      generateImage(question, i);
-    });
+    generateForQuestion(question);
+    const next = questions[currentIndex + 1];
+    if (next) generateForQuestion(next);
+  }, [question.id, generateForQuestion]);
+
+  // Reset video state when question changes
+  useEffect(() => {
+    speechSynthesis.cancel();
+    if (videoTimerRef.current) clearInterval(videoTimerRef.current);
+    setIsVideoPlaying(false);
+    setVideoProgress(0);
   }, [question.id]);
+
+  // Video player: narrate the scene description via speech synthesis
+  const handleVideoPlay = useCallback(() => {
+    if (isVideoPlaying) {
+      speechSynthesis.cancel();
+      if (videoTimerRef.current) clearInterval(videoTimerRef.current);
+      setIsVideoPlaying(false);
+      setVideoProgress(0);
+      return;
+    }
+    const text = question.videoDescription ?? "";
+    if (!text) return;
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "nl-NL";
+    utterance.rate = 0.85;
+
+    // Rough duration estimate: ~75 ms per character at 0.85x speed
+    const durationMs = Math.max(text.length * 75, 4000);
+    const startTime = Date.now();
+
+    setIsVideoPlaying(true);
+    setVideoProgress(0);
+
+    videoTimerRef.current = setInterval(() => {
+      const pct = Math.min(((Date.now() - startTime) / durationMs) * 100, 99);
+      setVideoProgress(pct);
+    }, 100);
+
+    utterance.onend = () => {
+      if (videoTimerRef.current) clearInterval(videoTimerRef.current);
+      setVideoProgress(100);
+      setTimeout(() => { setIsVideoPlaying(false); setVideoProgress(0); }, 800);
+    };
+
+    speechSynthesis.speak(utterance);
+  }, [isVideoPlaying, question.videoDescription]);
 
   const speakDutch = useCallback((text: string) => {
     const utterance = new SpeechSynthesisUtterance(text);
@@ -103,10 +162,8 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
         },
       });
       if (error) throw error;
-
       const stars = data.starRating || 3;
-      const correctedDutch = data.correctedDutch;
-      setFeedback({ text: data.feedback, stars, correctedDutch });
+      setFeedback({ text: data.feedback, stars, correctedDutch: data.correctedDutch });
       setResults(prev => ({
         ...prev,
         [question.id]: { questionId: question.id, userAnswer: answer, feedback: data.feedback, starRating: stars },
@@ -123,8 +180,7 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
     }
   }, [question, currentIndex, questions.length, opgaveInfo]);
 
-  // Hook up speech recognition via the shared hook
-  const { isListening, isPreparing, interimText: examInterimText, startListening, stopListening, cancelListening } = useSpeechRecognition({
+  const { isListening, isPreparing, interimText: examInterimText, startListening, stopListening } = useSpeechRecognition({
     scenario: `Exam Q${currentIndex + 1}`,
     lang: "nl-NL",
     onTranscript: evaluateAnswer,
@@ -134,10 +190,7 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
   });
 
   const handleTextSubmit = () => {
-    if (textInput.trim()) {
-      evaluateAnswer(textInput.trim());
-      setTextInput("");
-    }
+    if (textInput.trim()) { evaluateAnswer(textInput.trim()); setTextInput(""); }
   };
 
   const navigateTo = (index: number) => {
@@ -160,64 +213,127 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
     return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
-  // Check if we're at the start of a new opgave
   const isNewOpgave = currentIndex === 0 || questions[currentIndex - 1].opgave !== currentOpgave;
   const answeredCurrent = !!results[question.id];
 
-  // Render photo(s) based on opgave type
-  const renderPhotos = () => {
-    if (question.opgaveType === "video") {
-      return (
-        <div className="rounded-2xl overflow-hidden bg-muted aspect-video flex items-center justify-center border border-border">
-          <div className="flex flex-col items-center gap-3 text-muted-foreground p-6 text-center">
-            <Film className="h-12 w-12" />
-            <p className="text-sm font-bold">Filmpje</p>
-            <p className="text-sm">{question.videoDescription}</p>
-            <p className="text-xs text-muted-foreground/70 italic mt-1">
-              (In het echte examen ziet u hier een video)
-            </p>
-          </div>
-        </div>
-      );
-    }
+  // ── Video player ────────────────────────────────────────────────────────────
+  const renderVideo = () => {
+    const key = videoThumbKey(question.id);
+    const thumbUrl = generatedImages[key];
+    const isLoading = loadingImages[key];
 
-    const photoCount = question.imagePrompts.length;
-    const gridClass = photoCount === 1 ? "" : photoCount === 2 ? "grid grid-cols-2 gap-3" : "grid grid-cols-3 gap-3";
+    return (
+      <div className="rounded-2xl overflow-hidden border border-border relative aspect-video bg-slate-900 select-none">
+        {/* Thumbnail */}
+        {thumbUrl ? (
+          <img
+            src={thumbUrl}
+            alt="Video preview"
+            className={`w-full h-full object-cover transition-opacity duration-500 ${isVideoPlaying ? "opacity-50" : "opacity-85"}`}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900">
+            {isLoading ? (
+              <div className="flex flex-col items-center gap-2 text-white/40">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <p className="text-xs font-medium">Filmpje laden…</p>
+              </div>
+            ) : (
+              <Film className="h-16 w-16 text-white/15" />
+            )}
+          </div>
+        )}
+
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
+
+        {/* Subtitles shown while playing */}
+        <AnimatePresence>
+          {isVideoPlaying && (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              className="absolute bottom-14 left-4 right-4"
+            >
+              <div className="rounded-lg bg-black/80 px-3 py-2 text-center">
+                <p className="text-white text-sm leading-snug">{question.videoDescription}</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Progress bar */}
+        {videoProgress > 0 && (
+          <div className="absolute bottom-10 left-4 right-4 h-0.5 bg-white/20 rounded-full overflow-hidden">
+            <motion.div
+              className="h-full bg-white rounded-full"
+              style={{ width: `${videoProgress}%` }}
+              transition={{ ease: "linear" }}
+            />
+          </div>
+        )}
+
+        {/* Controls bar */}
+        <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-4 py-2.5">
+          <span className="text-white/50 text-xs font-medium flex items-center gap-1.5">
+            <Film className="h-3.5 w-3.5" /> Filmpje — Opgave 1
+          </span>
+          <button
+            onClick={handleVideoPlay}
+            className="flex items-center gap-1.5 bg-white/90 hover:bg-white active:scale-95 text-black px-4 py-1.5 rounded-full text-sm font-bold transition-all"
+          >
+            {isVideoPlaying
+              ? <><Pause className="h-3.5 w-3.5" /> Stop</>
+              : <><Play className="h-3.5 w-3.5" /> Bekijk de video</>
+            }
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Photo(s) ────────────────────────────────────────────────────────────────
+  const renderPhotos = () => {
+    const count = question.imagePrompts.length;
+    const gridClass =
+      count === 1 ? "" :
+      count === 2 ? "grid grid-cols-2 gap-3" :
+      "grid grid-cols-3 gap-2";
 
     return (
       <div className={gridClass}>
         {question.imagePrompts.map((_, i) => {
           const key = imageKey(question.id, i);
+          const imgUrl = generatedImages[key];
+          const isLoading = loadingImages[key];
           return (
-            <div key={i} className="rounded-2xl overflow-hidden bg-muted aspect-[4/3] flex items-center justify-center border border-border relative">
-              {photoCount > 1 && (
+            <div
+              key={i}
+              className="rounded-2xl overflow-hidden bg-muted aspect-[4/3] flex items-center justify-center border border-border relative"
+            >
+              {count > 1 && (
                 <span className="absolute top-2 left-2 bg-foreground/80 text-background text-xs font-bold px-2 py-0.5 rounded-md z-10">
                   {i + 1}
                 </span>
               )}
-              {generatedImages[key] ? (
-                <img
-                  src={generatedImages[key]}
+              {imgUrl ? (
+                <motion.img
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  src={imgUrl}
                   alt={question.placeholderDescriptions[i]}
                   className="w-full h-full object-cover"
                 />
-              ) : loadingImage === key ? (
+              ) : isLoading ? (
                 <div className="flex flex-col items-center gap-2 text-muted-foreground">
                   <Loader2 className="h-6 w-6 animate-spin" />
-                  <p className="text-xs font-medium">Foto laden...</p>
+                  <p className="text-xs font-medium">Foto laden…</p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-2 text-muted-foreground p-4 text-center">
-                  <Camera className="h-8 w-8" />
+                  <Camera className="h-8 w-8 opacity-40" />
                   <p className="text-xs font-medium">{question.placeholderDescriptions[i]}</p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => generateImage(question, i)}
-                    className="rounded-xl text-xs"
-                  >
-                    Foto laden
-                  </Button>
                 </div>
               )}
             </div>
@@ -227,6 +343,7 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
     );
   };
 
+  // ── Main render ─────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-4 max-w-2xl mx-auto">
       {/* Top bar: timer + progress */}
@@ -245,7 +362,6 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
         {questions.map((q, i) => {
           const isAnswered = !!results[q.id];
           const isCurrent = i === currentIndex;
-          // Show opgave separators
           const showSep = i > 0 && questions[i - 1].opgave !== q.opgave;
           return (
             <div key={q.id} className="flex items-center">
@@ -267,7 +383,7 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
         })}
       </div>
 
-      {/* Opgave header (shown at start of each section) */}
+      {/* Opgave header (shown once per section) */}
       {isNewOpgave && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -279,16 +395,14 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
         </motion.div>
       )}
 
-      {/* Photo(s) / Video placeholder */}
-      {renderPhotos()}
+      {/* Visual content: video player or photo(s) */}
+      {question.opgaveType === "video" ? renderVideo() : renderPhotos()}
 
-      {/* Situation + Question */}
+      {/* Situation + Question card */}
       <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
-        <div className="flex items-start gap-3">
-          <div className="flex-1">
-            <p className="text-sm text-muted-foreground italic">{question.situationDutch}</p>
-            <p className="text-xs text-muted-foreground/70 mt-0.5">{question.situationEnglish}</p>
-          </div>
+        <div>
+          <p className="text-sm text-muted-foreground italic">{question.situationDutch}</p>
+          <p className="text-xs text-muted-foreground/70 mt-0.5">{question.situationEnglish}</p>
         </div>
 
         <div className="flex items-start gap-3 pt-2 border-t border-border">
@@ -310,7 +424,7 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
           </div>
         </div>
 
-        {/* Hints */}
+        {/* Hints toggle */}
         <button
           onClick={() => setShowHints(!showHints)}
           className="flex items-center gap-1.5 text-xs font-semibold text-primary"
@@ -347,7 +461,7 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
           {isEvaluating ? (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin" />
-              <span className="text-sm font-medium">Antwoord beoordelen...</span>
+              <span className="text-sm font-medium">Antwoord beoordelen…</span>
             </div>
           ) : (
             <>
@@ -361,17 +475,13 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75" />
                     <span className="relative inline-flex rounded-full h-3 w-3 bg-destructive" />
                   </span>
-                  <span className="text-sm font-bold text-destructive">
-                    Opname...
-                  </span>
+                  <span className="text-sm font-bold text-destructive">Opname…</span>
                   {examInterimText && (
                     <span className="text-xs text-muted-foreground italic truncate max-w-[200px]">
                       "{examInterimText}"
                     </span>
                   )}
-                  <span className="text-xs text-muted-foreground">
-                    Druk op stop als u klaar bent
-                  </span>
+                  <span className="text-xs text-muted-foreground">Druk op stop als u klaar bent</span>
                 </motion.div>
               )}
 
@@ -387,8 +497,12 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
                       : "bg-gradient-hero text-primary-foreground shadow-primary"
                   }`}
                 >
-                  {isPreparing ? <Loader2 className="h-5 w-5 animate-spin" /> : isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-                  {isPreparing ? "Mic voorbereiden..." : isListening ? "Stop opname" : "Start opname"}
+                  {isPreparing
+                    ? <><Loader2 className="h-5 w-5 animate-spin" /> Mic voorbereiden…</>
+                    : isListening
+                    ? <><MicOff className="h-5 w-5" /> Stop opname</>
+                    : <><Mic className="h-5 w-5" /> Start opname</>
+                  }
                 </Button>
                 {!isListening && (
                   <Button
@@ -405,7 +519,8 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
 
               {!isListening && (
                 <p className="text-xs text-muted-foreground text-center max-w-xs">
-                  Druk op <strong>Start opname</strong>, spreek uw antwoord in, en druk op <strong>Stop opname</strong> als u klaar bent.
+                  Druk op <strong>Start opname</strong>, spreek uw antwoord in, en druk op{" "}
+                  <strong>Stop opname</strong> als u klaar bent.
                 </p>
               )}
 
@@ -419,7 +534,7 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
                     value={textInput}
                     onChange={(e) => setTextInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleTextSubmit()}
-                    placeholder="Typ uw antwoord in het Nederlands..."
+                    placeholder="Typ uw antwoord in het Nederlands…"
                     className="rounded-xl"
                   />
                   <Button onClick={handleTextSubmit} className="rounded-xl">
@@ -442,9 +557,7 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
                 {Array.from({ length: 5 }).map((_, i) => (
                   <Star
                     key={i}
-                    className={`h-5 w-5 ${
-                      i < feedback.stars ? "fill-primary text-primary" : "text-muted"
-                    }`}
+                    className={`h-5 w-5 ${i < feedback.stars ? "fill-primary text-primary" : "text-muted"}`}
                   />
                 ))}
               </div>
@@ -455,7 +568,9 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
           {(currentAnswer || results[question.id]?.userAnswer) && (
             <div className="rounded-xl bg-muted/50 p-3">
               <p className="text-xs font-medium text-muted-foreground mb-1">Uw antwoord:</p>
-              <p className="text-sm font-semibold text-foreground">{currentAnswer || results[question.id]?.userAnswer}</p>
+              <p className="text-sm font-semibold text-foreground">
+                {currentAnswer || results[question.id]?.userAnswer}
+              </p>
             </div>
           )}
 
