@@ -126,13 +126,13 @@ const Index = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <h1>
-              <PraatMaarLogo maarSize="72px" variant="light" className="mb-6 lg:mb-8" />
-            </h1>
-            <p className="font-sans text-lg text-warm-grey leading-relaxed mb-8 max-w-sm">
+            <p className="font-sans text-lg text-warm-grey leading-relaxed mb-4 max-w-sm">
               A quiet space to practice Dutch, guided by AI. Conversations,
               vocabulary, and exam preparation for the <em>inburgering</em>.
             </p>
+            <h1>
+              <PraatMaarLogo maarSize="72px" variant="light" className="mb-8" />
+            </h1>
             {!user && (
               <button
                 onClick={() => navigate("/auth")}
