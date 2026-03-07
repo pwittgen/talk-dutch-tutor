@@ -37,7 +37,7 @@ const PraatMaarLogo = ({
           style={{
             fontFamily: "'Space Mono', monospace",
             fontWeight: 700,
-            fontSize: "1em",
+            fontSize: "0.78em",
             color: colors.maar,
             letterSpacing: "-0.02em",
           }}
