@@ -116,6 +116,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
     setIsSpeaking(true);
 
     const fallbackToSpeechSynthesis = () => {
+      ttsHasPlayedRef.current = true;
       setIsSpeaking(false);
       const utterance = new SpeechSynthesisUtterance(spokenText);
       utterance.lang = "nl-NL";
