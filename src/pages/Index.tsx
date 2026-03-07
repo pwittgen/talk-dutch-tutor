@@ -8,7 +8,7 @@ import ScenarioCard from "@/components/ScenarioCard";
 import VocabCategoryCard from "@/components/VocabCategoryCard";
 import SectionTabs, { type SectionId } from "@/components/SectionTabs";
 import { useAuth } from "@/hooks/useAuth";
-import heroImage from "@/assets/hero-dutch.jpg";
+
 import PraatMaarLogo from "@/components/PraatMaarLogo";
 
 const examCategories = [
