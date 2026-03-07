@@ -283,7 +283,7 @@ const AdminExamPage = () => {
           body: { prompt: s.prompt, questionId: s.questionId },
         });
         if (error || !data?.imageUrl) throw new Error("Generation failed");
-        await supabase.from("exam_question_images").upsert(
+        await (supabase as any).from("exam_question_images").upsert(
           { question_id: s.questionId, image_slot: s.slot, prompt: s.prompt, image_url: data.imageUrl, status: "cached" },
           { onConflict: "question_id,image_slot" },
         );
