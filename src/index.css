@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap');
 
 @keyframes blink {
   0%, 100% { opacity: 1; }
@@ -11,58 +11,100 @@
 
 @layer base {
   :root {
-    /* Off-white paper background */
-    --background: 42 22% 95%;
-    --foreground: 0 0% 7%;
+    /* Brand palette */
+    --color-ink:        #18160F;
+    --color-cream:      #F4EFE6;
+    --color-off-white:  #FAF8F3;
+    --color-rust:       #BF4E2B;
+    --color-gold:       #B8895A;
+    --color-sage:       #3D5444;
+    --color-slate:      #1E2530;
+    --color-sand:       #D8CCBA;
+    --color-warm-grey:  #6B6560;
+    --color-light-grey: #E8E4DC;
 
-    --card: 42 22% 97%;
-    --card-foreground: 0 0% 7%;
+    /* Font stack */
+    --font-serif: 'Playfair Display', Georgia, serif;
+    --font-mono:  'Space Mono', 'Courier New', monospace;
+    --font-sans:  'DM Sans', system-ui, sans-serif;
 
-    --popover: 42 22% 97%;
-    --popover-foreground: 0 0% 7%;
+    /* shadcn/ui tokens — mapped to brand */
+    /* off-white page background: #FAF8F3 ≈ hsl(43 43% 97%) */
+    --background: 43 43% 97%;
+    --foreground: 47 23% 8%;      /* ink #18160F */
 
-    /* Deep book green — primary accent */
-    --primary: 158 61% 17%;
-    --primary-foreground: 42 22% 95%;
+    /* cream card surface: #F4EFE6 ≈ hsl(39 39% 93%) */
+    --card: 39 39% 93%;
+    --card-foreground: 47 23% 8%;
 
-    /* Burnt umber — secondary accent */
-    --secondary: 18 49% 36%;
-    --secondary-foreground: 42 22% 95%;
+    --popover: 39 39% 93%;
+    --popover-foreground: 47 23% 8%;
 
-    /* Warm grey */
-    --muted: 40 12% 86%;
-    --muted-foreground: 0 0% 47%;
+    /* rust primary #BF4E2B ≈ hsl(14 63% 46%) */
+    --primary: 14 63% 46%;
+    --primary-foreground: 43 43% 97%;
 
-    /* Accent = deep green */
-    --accent: 158 61% 17%;
-    --accent-foreground: 42 22% 95%;
+    /* gold secondary #B8895A ≈ hsl(30 40% 54%) */
+    --secondary: 30 40% 54%;
+    --secondary-foreground: 47 23% 8%;
 
-    /* Feedback colors */
+    /* light-grey muted: #E8E4DC ≈ hsl(40 21% 89%) */
+    --muted: 40 21% 89%;
+    --muted-foreground: 27 5% 40%;  /* warm-grey #6B6560 */
+
+    /* rust as accent */
+    --accent: 14 63% 46%;
+    --accent-foreground: 43 43% 97%;
+
     --destructive: 0 72% 55%;
     --destructive-foreground: 0 0% 100%;
 
     --success: 145 60% 38%;
     --success-foreground: 0 0% 100%;
 
-    --border: 40 12% 82%;
-    --input: 40 12% 82%;
-    --ring: 158 61% 17%;
+    /* sand border: #D8CCBA ≈ hsl(36 28% 79%) */
+    --border: 36 28% 79%;
+    --input: 36 28% 79%;
+    --ring: 14 63% 46%;
 
-    --radius: 0.375rem;
+    /* max 4px border radius per brand spec */
+    --radius: 0.25rem;
 
-    /* Solid accent blocks (no gradients) */
-    --shadow-card: 0 1px 6px -1px hsl(0 0% 0% / 0.07);
-    --shadow-card-hover: 0 4px 14px -4px hsl(0 0% 0% / 0.11);
-    --shadow-primary: 0 2px 10px -2px hsl(158 61% 17% / 0.25);
+    /* Minimal shadows — no heavy drop shadows */
+    --shadow-card: 0 1px 4px rgba(0,0,0,0.06);
+    --shadow-card-hover: 0 1px 4px rgba(0,0,0,0.08);
+    --shadow-primary: 0 2px 8px -2px rgba(191,78,43,0.22);
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 43 43% 97%;
+    --sidebar-foreground: 47 23% 8%;
+    --sidebar-primary: 14 63% 46%;
+    --sidebar-primary-foreground: 43 43% 97%;
+    --sidebar-accent: 40 21% 89%;
+    --sidebar-accent-foreground: 47 23% 8%;
+    --sidebar-border: 36 28% 79%;
+    --sidebar-ring: 14 63% 46%;
+  }
+
+  .dark {
+    --background: 47 23% 8%;
+    --foreground: 43 43% 97%;
+    --card: 217 23% 15%;
+    --card-foreground: 43 43% 97%;
+    --popover: 217 23% 15%;
+    --popover-foreground: 43 43% 97%;
+    --primary: 14 63% 46%;
+    --primary-foreground: 43 43% 97%;
+    --secondary: 30 40% 54%;
+    --secondary-foreground: 43 43% 97%;
+    --muted: 217 15% 22%;
+    --muted-foreground: 36 12% 60%;
+    --accent: 14 63% 46%;
+    --accent-foreground: 43 43% 97%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 36 15% 25%;
+    --input: 36 15% 25%;
+    --ring: 14 63% 46%;
   }
 }
 
@@ -73,16 +115,16 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+    font-family: var(--font-sans);
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Playfair Display', Georgia, serif;
+    font-family: var(--font-serif);
   }
 }
 
 @layer utilities {
-  /* Kept for backward compatibility — solid colors now, no gradients */
+  /* Rust accent — primary CTA surface */
   .text-gradient-hero {
     color: hsl(var(--primary));
   }
@@ -91,6 +133,7 @@
     background: hsl(var(--primary));
   }
 
+  /* Gold secondary surface */
   .bg-gradient-delft {
     background: hsl(var(--secondary));
   }
@@ -109,5 +152,15 @@
 
   .shadow-primary {
     box-shadow: var(--shadow-primary);
+  }
+
+  /* Left accent bar — brand motif for cards / callouts */
+  .border-accent-bar {
+    border-left: 4px solid hsl(var(--primary));
+  }
+
+  /* Mono label utility */
+  .font-mono-label {
+    font-family: var(--font-mono);
   }
 }

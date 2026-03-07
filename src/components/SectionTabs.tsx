@@ -14,32 +14,28 @@ const tabs: { id: SectionId; label: string; subtitle: string }[] = [
 ];
 
 const SectionTabs = ({ activeSection, onSectionChange }: SectionTabsProps) => {
-  const handleTabClick = (tabId: SectionId) => {
-    onSectionChange(tabId);
-  };
-
   return (
-    <div className="flex border-b border-border gap-8">
+    <div className="flex border-b border-sand gap-8">
       {tabs.map((tab) => (
         <button
           key={tab.id}
-          onClick={() => handleTabClick(tab.id)}
+          onClick={() => onSectionChange(tab.id)}
           className={`relative pb-4 text-left transition-colors ${
             activeSection === tab.id
-              ? "text-foreground"
-              : "text-muted-foreground hover:text-foreground/70"
+              ? "text-ink"
+              : "text-warm-grey hover:text-ink/70"
           }`}
         >
-          <span className="block text-sm font-medium tracking-wide font-sans">
+          <span className="font-mono block text-xs font-bold tracking-wider uppercase">
             {tab.label}
           </span>
-          <span className="block text-xs text-muted-foreground tracking-wider uppercase font-sans mt-0.5">
+          <span className="font-mono block text-[10px] text-warm-grey tracking-widest uppercase mt-0.5">
             {tab.subtitle}
           </span>
           {activeSection === tab.id && (
             <motion.div
               layoutId="activeTab"
-              className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
+              className="absolute bottom-0 left-0 right-0 h-0.5 bg-rust"
               transition={{ type: "spring", bounce: 0.15, duration: 0.4 }}
             />
           )}

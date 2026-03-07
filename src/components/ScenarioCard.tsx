@@ -21,13 +21,13 @@ const ScenarioCard = ({ scenario, index }: ScenarioCardProps) => {
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.07, duration: 0.45, ease: "easeOut" }}
-      whileHover={{ y: -4, scale: 1.015 }}
-      whileTap={{ scale: 0.98 }}
+      whileHover={{ y: -3 }}
+      whileTap={{ scale: 0.99 }}
       onClick={() => navigate(`/scenario/${scenario.id}`)}
-      className="group flex flex-col items-start overflow-hidden rounded bg-card border border-border text-left shadow-card transition-shadow hover:shadow-card-hover"
+      className="group flex flex-col items-start overflow-hidden rounded bg-card border border-sand text-left transition-all hover:border-rust/40"
     >
       {/* Scenario image */}
-      <div className="relative w-full h-36 overflow-hidden bg-muted">
+      <div className="relative w-full h-36 overflow-hidden bg-light-grey">
         <img
           src={scenario.scenarioImage}
           alt={scenario.title}
@@ -35,24 +35,24 @@ const ScenarioCard = ({ scenario, index }: ScenarioCardProps) => {
         />
       </div>
 
-      <div className="p-5 flex flex-col gap-1.5 w-full">
+      <div className="p-5 flex flex-col gap-1.5 w-full border-l-4 border-l-transparent group-hover:border-l-rust transition-colors">
         {/* Level label */}
-        <span className="text-[10px] tracking-[0.18em] uppercase text-muted-foreground font-sans">
+        <span className="font-mono text-[10px] tracking-[0.18em] uppercase text-warm-grey">
           {scenario.emoji} {difficultyLabel[scenario.difficulty]}
         </span>
 
-        <h3 className="font-display text-lg font-semibold text-foreground leading-snug">
+        <h3 className="font-display text-lg font-bold text-ink leading-snug">
           {scenario.title}
         </h3>
-        <p className="text-sm text-secondary italic font-sans">
+        <p className="font-sans text-sm text-gold italic">
           {scenario.dutchTitle}
         </p>
-        <p className="text-sm text-muted-foreground leading-relaxed font-sans">
+        <p className="font-sans text-sm text-warm-grey leading-relaxed">
           {scenario.description}
         </p>
 
         {/* CTA */}
-        <div className="mt-3 text-sm font-medium text-primary opacity-0 transition-opacity duration-200 group-hover:opacity-100 font-sans">
+        <div className="mt-3 font-mono text-xs font-bold text-rust opacity-0 transition-opacity duration-200 group-hover:opacity-100">
           Begin →
         </div>
       </div>

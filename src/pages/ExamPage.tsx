@@ -2,7 +2,6 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Trophy, Star, RotateCcw, Clock, CheckCircle2, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { examQuestions, type ExamQuestion } from "@/data/examQuestions";
 import ExamSimulation, { type ExamResult } from "@/components/ExamSimulation";
 
@@ -14,8 +13,6 @@ const pickSessionQuestions = (): ExamQuestion[] => {
   return examQuestions
     .filter((q) => q.id >= startId && q.id < startId + 16)
     .map((q) => {
-      // For video questions, use the thumbnail prompt as a regular photo
-      // so ExamSimulation can treat every question type uniformly.
       if (q.opgaveType === "video" && q.videoThumbnailPrompt) {
         return {
           ...q,
@@ -59,7 +56,6 @@ const ExamPage = () => {
   const [started, setStarted] = useState(false);
   const [results, setResults] = useState<ExamResult[] | null>(null);
 
-  // Questions are fixed for the session — memoised so they don't reshuffle on re-render
   const sessionQuestions = useMemo(() => pickSessionQuestions(), []);
 
   const handleComplete = (examResults: ExamResult[]) => setResults(examResults);
@@ -74,15 +70,15 @@ const ExamPage = () => {
   if (results) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-10">
+        <div className="border-b border-sand bg-card/80 backdrop-blur-sm sticky top-0 z-10">
           <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
             <button
               onClick={() => navigate(-1)}
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              className="flex h-10 w-10 items-center justify-center rounded text-warm-grey hover:bg-light-grey hover:text-ink transition-colors"
             >
-              <ArrowLeft className="h-5 w-5" />
+              <ArrowLeft className="h-5 w-5" strokeWidth={1.5} />
             </button>
-            <h1 className="font-display text-lg font-bold text-foreground">Resultaten</h1>
+            <h1 className="font-display text-lg font-bold text-ink">Resultaten</h1>
           </div>
         </div>
 
@@ -90,20 +86,21 @@ const ExamPage = () => {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-8"
+            className="mb-8"
           >
-            <Trophy className="h-14 w-14 text-primary mx-auto mb-4" />
-            <h2 className="font-display text-3xl font-black text-foreground">Oefenexamen klaar!</h2>
-            <div className="flex items-center justify-center gap-1 mt-3">
+            <Trophy className="h-12 w-12 text-rust mb-4" strokeWidth={1.5} />
+            <h2 className="font-display text-3xl font-black text-ink">Oefenexamen klaar!</h2>
+            <div className="flex items-center gap-1 mt-3">
               {Array.from({ length: 5 }).map((_, i) => (
                 <Star
                   key={i}
-                  className={`h-6 w-6 ${i < Math.round(averageStars) ? "fill-primary text-primary" : "text-muted"}`}
+                  className={`h-5 w-5 ${i < Math.round(averageStars) ? "fill-rust text-rust" : "text-sand"}`}
+                  strokeWidth={1.5}
                 />
               ))}
-              <span className="ml-2 text-lg font-bold text-foreground">{averageStars.toFixed(1)} / 5</span>
+              <span className="ml-2 font-sans font-medium text-ink">{averageStars.toFixed(1)} / 5</span>
             </div>
-            <p className="mt-2 text-muted-foreground">
+            <p className="mt-2 font-sans text-warm-grey text-sm">
               {answeredCount} van {sessionQuestions.length} vragen beantwoord
             </p>
           </motion.div>
@@ -112,37 +109,41 @@ const ExamPage = () => {
             {results.map((result, i) => {
               const q = sessionQuestions.find((eq) => eq.id === result.questionId);
               return (
-                <div key={i} className="rounded-xl bg-card border border-border p-4">
+                <div key={i} className="rounded bg-card border border-sand p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-bold text-muted-foreground">
+                    <span className="font-mono text-xs text-warm-grey">
                       Opgave {q?.opgave} — Vraag {i + 1}
                     </span>
                     <div className="flex gap-0.5">
                       {Array.from({ length: 5 }).map((_, j) => (
                         <Star
                           key={j}
-                          className={`h-3.5 w-3.5 ${j < (result.starRating ?? 0) ? "fill-primary text-primary" : "text-muted"}`}
+                          className={`h-3.5 w-3.5 ${j < (result.starRating ?? 0) ? "fill-rust text-rust" : "text-sand"}`}
+                          strokeWidth={1.5}
                         />
                       ))}
                     </div>
                   </div>
-                  <p className="text-sm text-foreground font-medium">{q?.dutchQuestion}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Uw antwoord: {result.userAnswer}</p>
+                  <p className="font-sans text-sm text-ink font-medium">{q?.dutchQuestion}</p>
+                  <p className="font-sans text-xs text-warm-grey mt-1">Uw antwoord: {result.userAnswer}</p>
                 </div>
               );
             })}
           </div>
 
           <div className="flex flex-col gap-3 mt-8">
-            <Button
+            <button
               onClick={() => { setResults(null); setStarted(true); }}
-              className="rounded-xl bg-gradient-delft text-secondary-foreground gap-2"
+              className="w-full flex items-center justify-center gap-2 bg-rust text-off-white font-sans font-medium py-3 rounded text-sm hover:bg-ink transition-colors"
             >
-              <RotateCcw className="h-4 w-4" /> Opnieuw proberen
-            </Button>
-            <Button onClick={() => navigate(-1)} variant="outline" className="rounded-xl">
+              <RotateCcw className="h-4 w-4" strokeWidth={1.5} /> Opnieuw proberen
+            </button>
+            <button
+              onClick={() => navigate(-1)}
+              className="w-full border border-sand text-ink font-sans font-medium py-3 rounded text-sm hover:bg-light-grey transition-colors"
+            >
               Terug naar examenoverzicht
-            </Button>
+            </button>
           </div>
         </div>
       </div>
@@ -153,15 +154,15 @@ const ExamPage = () => {
   if (started) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-10">
+        <div className="border-b border-sand bg-card/80 backdrop-blur-sm sticky top-0 z-10">
           <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
             <button
               onClick={() => setStarted(false)}
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              className="flex h-10 w-10 items-center justify-center rounded text-warm-grey hover:bg-light-grey hover:text-ink transition-colors"
             >
-              <ArrowLeft className="h-5 w-5" />
+              <ArrowLeft className="h-5 w-5" strokeWidth={1.5} />
             </button>
-            <h1 className="font-display text-lg font-bold text-foreground">🎓 A2 Spreken Oefenexamen</h1>
+            <h1 className="font-display text-lg font-bold text-ink">A2 Spreken oefenexamen</h1>
           </div>
         </div>
         <div className="mx-auto max-w-2xl px-4 py-6">
@@ -174,24 +175,23 @@ const ExamPage = () => {
   // ── Detail / start screen ───────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background">
-      <div className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-10">
+      <div className="border-b border-sand bg-card/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
           <button
             onClick={() => navigate(-1)}
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            className="flex h-10 w-10 items-center justify-center rounded text-warm-grey hover:bg-light-grey hover:text-ink transition-colors"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-5 w-5" strokeWidth={1.5} />
           </button>
-          <h1 className="font-display text-lg font-bold text-foreground">🗣️ Spreken</h1>
+          <h1 className="font-display text-lg font-bold text-ink">🗣️ Spreken</h1>
         </div>
       </div>
 
       <div className="mx-auto max-w-2xl px-4 py-10 space-y-8">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
-          {/* Header */}
           <div className="mb-8">
-            <h2 className="font-display text-3xl font-black text-foreground">A2 Spreken Oefenexamen</h2>
-            <p className="mt-2 text-muted-foreground leading-relaxed">
+            <h2 className="font-display text-3xl font-black text-ink">A2 Spreken oefenexamen</h2>
+            <p className="mt-2 font-sans text-warm-grey leading-relaxed">
               Oefen het DUO A2 Spreekvaardigheidsexamen. Alle antwoorden zijn gesproken — net als bij het echte examen.
             </p>
           </div>
@@ -203,26 +203,26 @@ const ExamPage = () => {
               { icon: "📋", value: "4", label: "Onderdelen" },
               { icon: "⏱️", value: "±35 min", label: "Duur" },
             ].map((s) => (
-              <div key={s.label} className="rounded-xl bg-card border border-border p-4 text-center">
+              <div key={s.label} className="rounded bg-card border border-sand p-4 text-center">
                 <div className="text-2xl mb-1">{s.icon}</div>
-                <p className="font-display text-lg font-black text-foreground">{s.value}</p>
-                <p className="text-xs text-muted-foreground">{s.label}</p>
+                <p className="font-display text-lg font-black text-ink">{s.value}</p>
+                <p className="font-mono text-xs text-warm-grey">{s.label}</p>
               </div>
             ))}
           </div>
 
           {/* Opgave breakdown */}
           <div className="space-y-3 mb-8">
-            <h3 className="font-display text-base font-bold text-foreground">Inhoud per onderdeel</h3>
+            <h3 className="font-display text-base font-bold text-ink">Inhoud per onderdeel</h3>
             {opgaveDetails.map((o, i) => (
-              <div key={i} className="rounded-xl bg-card border border-border p-4">
+              <div key={i} className="rounded bg-card border border-sand border-l-4 border-l-rust p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1">
-                    <p className="font-display text-sm font-black text-primary">{o.label}</p>
-                    <p className="text-sm text-muted-foreground mt-1">{o.description}</p>
-                    <p className="text-xs text-foreground/60 mt-1.5 italic">💡 {o.tip}</p>
+                    <p className="font-mono text-xs font-bold text-rust uppercase tracking-wider">{o.label}</p>
+                    <p className="font-sans text-sm text-warm-grey mt-1">{o.description}</p>
+                    <p className="font-sans text-xs text-warm-grey/70 mt-1.5 italic">💡 {o.tip}</p>
                   </div>
-                  <span className="shrink-0 text-xs font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                  <span className="shrink-0 font-mono text-xs font-bold text-warm-grey bg-light-grey px-2 py-0.5 rounded">
                     {o.questions}×
                   </span>
                 </div>
@@ -231,34 +231,34 @@ const ExamPage = () => {
           </div>
 
           {/* Passing requirements */}
-          <div className="rounded-xl bg-primary/5 border border-primary/20 p-4 mb-8">
+          <div className="rounded bg-rust/5 border border-rust/20 p-4 mb-8">
             <div className="flex items-center gap-2 mb-3">
-              <CheckCircle2 className="h-4 w-4 text-primary" />
-              <h3 className="font-display text-sm font-black text-primary">Slagingsnorm</h3>
+              <CheckCircle2 className="h-4 w-4 text-rust" strokeWidth={1.5} />
+              <h3 className="font-mono text-xs font-bold text-rust uppercase tracking-wider">Slagingsnorm</h3>
             </div>
-            <ul className="text-sm text-foreground space-y-1.5">
+            <ul className="font-sans text-sm text-ink space-y-1.5">
               <li className="flex items-start gap-2">
-                <ChevronRight className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                <ChevronRight className="h-3.5 w-3.5 text-rust shrink-0 mt-0.5" strokeWidth={1.5} />
                 Antwoord in begrijpelijk Nederlands — fouten zijn toegestaan
               </li>
               <li className="flex items-start gap-2">
-                <ChevronRight className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                <ChevronRight className="h-3.5 w-3.5 text-rust shrink-0 mt-0.5" strokeWidth={1.5} />
                 Beantwoord minstens 10 van de 16 vragen voldoende
               </li>
               <li className="flex items-start gap-2">
-                <ChevronRight className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                <ChevronRight className="h-3.5 w-3.5 text-rust shrink-0 mt-0.5" strokeWidth={1.5} />
                 Elke opgave telt mee — zorg voor antwoorden in alle 4 onderdelen
               </li>
             </ul>
           </div>
 
           {/* Tips */}
-          <div className="rounded-xl bg-muted/50 p-4 mb-8">
+          <div className="rounded bg-light-grey p-4 mb-8">
             <div className="flex items-center gap-2 mb-3">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <h3 className="font-display text-sm font-bold text-foreground">Tips voor het examen</h3>
+              <Clock className="h-4 w-4 text-warm-grey" strokeWidth={1.5} />
+              <h3 className="font-mono text-xs font-bold text-ink uppercase tracking-wider">Tips voor het examen</h3>
             </div>
-            <ul className="text-sm text-muted-foreground space-y-1.5">
+            <ul className="font-sans text-sm text-warm-grey space-y-1.5">
               <li>• Geef korte antwoorden — 1 à 2 zinnen is genoeg</li>
               <li>• Beantwoord de vraag direct; u hoeft niet alles te beschrijven</li>
               <li>• Gebruik simpele woorden die u zeker kent</li>
@@ -267,12 +267,12 @@ const ExamPage = () => {
             </ul>
           </div>
 
-          <Button
+          <button
             onClick={() => setStarted(true)}
-            className="w-full rounded-2xl h-14 text-lg font-bold bg-gradient-delft text-secondary-foreground shadow-card"
+            className="w-full h-14 bg-rust text-off-white font-sans font-medium text-base rounded hover:bg-ink transition-colors"
           >
             Start oefenexamen
-          </Button>
+          </button>
         </motion.div>
       </div>
     </div>
