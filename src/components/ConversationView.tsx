@@ -61,6 +61,7 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
   const progress = ((currentTurn) / activeTurns.length) * 100;
 
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [micEnabled, setMicEnabled] = useState(false);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const preloadedAudioRef = useRef<{ text: string; blobUrl: string } | null>(null);
   // Holds an Audio element activated synchronously from a gesture, for use after an async gap
@@ -193,6 +194,26 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
       return () => clearTimeout(timeout);
     }
   }, [muted]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Enable mic only after TTS finishes (+ 400ms for OS audio session release).
+  // When muted there is no TTS, so enable mic after a short delay instead.
+  useEffect(() => {
+    if (muted) {
+      const t = setTimeout(() => setMicEnabled(true), 200);
+      return () => clearTimeout(t);
+    }
+    if (isSpeaking) {
+      setMicEnabled(false);
+      return;
+    }
+    const t = setTimeout(() => setMicEnabled(true), 400);
+    return () => clearTimeout(t);
+  }, [isSpeaking, muted]);
+
+  // Reset mic gate when advancing to a new turn
+  useEffect(() => {
+    setMicEnabled(false);
+  }, [currentTurn]);
 
   const evaluateWithAI = useCallback(async (answer: string) => {
     setIsEvaluating(true);
@@ -549,9 +570,11 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
               <motion.button
                 onClick={handleMicClick}
                 whileTap={{ scale: 0.95 }}
-                disabled={isPreparing}
+                disabled={!micEnabled || isPreparing}
                 className={`relative flex h-20 w-20 items-center justify-center rounded-full transition-all duration-200 ${
-                  isPreparing
+                  !micEnabled
+                    ? "bg-muted text-muted-foreground opacity-40"
+                    : isPreparing
                     ? "bg-muted text-muted-foreground"
                     : isListening
                     ? "bg-destructive text-destructive-foreground scale-110"
@@ -579,7 +602,9 @@ const ConversationView = ({ turns, scenarioEmoji, scenarioTitle, openEnded, mute
                   : isListening
                   ? recordingSettings.mode === "manual"
                     ? "Recording... tap to stop"
-                    : `Listening... (${recordingSettings.autoStopSeconds}s)`
+                    : "Listening..."
+                  : !micEnabled
+                  ? "Playing..."
                   : "Tap to speak your answer"
                 }
               </p>
