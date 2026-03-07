@@ -60,7 +60,7 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
       // 1. Check persistent cache in Supabase
       const questionId = parseInt(key.split("-")[0]);
       const imageSlot = parseInt(key.split("-")[1] ?? "0");
-      const { data: cached } = await supabase
+      const { data: cached } = await (supabase as any)
         .from("exam_question_images")
         .select("image_url")
         .eq("question_id", questionId)
