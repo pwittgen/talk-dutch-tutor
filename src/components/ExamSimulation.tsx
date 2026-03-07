@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Mic, MicOff, ArrowRight, ArrowLeft, Camera, Loader2,
   Star, BookOpen, ChevronDown, Keyboard, Volume2, Clock,
-  Film, Play, Pause,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,12 +34,9 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
   const [generatedImages, setGeneratedImages] = useState<Record<string, string>>({});
   const [loadingImages, setLoadingImages] = useState<Record<string, boolean>>({});
   const [examElapsed, setExamElapsed] = useState(0);
-  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
-  const [videoProgress, setVideoProgress] = useState(0);
 
   const examTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const videoTimerRef = useRef<NodeJS.Timeout | null>(null);
-  // Refs to track in-flight requests and generated images without stale closures
+  // Concurrent-safe image tracking — refs avoid stale closures
   const inFlightRef = useRef<Set<string>>(new Set());
   const generatedRef = useRef<Record<string, string>>({});
 
@@ -48,101 +44,77 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
   const currentOpgave = question.opgave;
   const opgaveInfo = opgaveDescriptions[currentOpgave];
 
-  // Exam elapsed timer
   useEffect(() => {
-    examTimerRef.current = setInterval(() => setExamElapsed(prev => prev + 1), 1000);
+    examTimerRef.current = setInterval(() => setExamElapsed((p) => p + 1), 1000);
     return () => { if (examTimerRef.current) clearInterval(examTimerRef.current); };
   }, []);
 
   const imageKey = (qId: number, idx: number) => `${qId}-${idx}`;
-  const videoThumbKey = (qId: number) => `${qId}-video-thumb`;
 
-  // Concurrent-safe image generator — uses refs to avoid stale closures
+  // ── Image generation (concurrent-safe, with Supabase cache check) ──────────
   const generateImageForKey = useCallback(async (key: string, prompt: string) => {
     if (generatedRef.current[key] || inFlightRef.current.has(key)) return;
     inFlightRef.current.add(key);
-    setLoadingImages(prev => ({ ...prev, [key]: true }));
+    setLoadingImages((prev) => ({ ...prev, [key]: true }));
     try {
+      // 1. Check persistent cache in Supabase
+      const questionId = parseInt(key.split("-")[0]);
+      const imageSlot = parseInt(key.split("-")[1] ?? "0");
+      const { data: cached } = await supabase
+        .from("exam_question_images")
+        .select("image_url")
+        .eq("question_id", questionId)
+        .eq("image_slot", imageSlot)
+        .eq("status", "cached")
+        .maybeSingle();
+
+      if (cached?.image_url) {
+        generatedRef.current[key] = cached.image_url;
+        setGeneratedImages((prev) => ({ ...prev, [key]: cached.image_url }));
+        return;
+      }
+
+      // 2. Generate on-demand and persist
       const response = await supabase.functions.invoke("generate-exam-image", {
-        body: { prompt, questionId: parseInt(key.split("-")[0]) },
+        body: { prompt, questionId, imageSlot },
       });
       if (!response.error && response.data?.imageUrl) {
-        generatedRef.current[key] = response.data.imageUrl;
-        setGeneratedImages(prev => ({ ...prev, [key]: response.data.imageUrl }));
+        const url: string = response.data.imageUrl;
+        generatedRef.current[key] = url;
+        setGeneratedImages((prev) => ({ ...prev, [key]: url }));
+        // Best-effort cache save (no await — don't block the UI)
+        supabase.from("exam_question_images").upsert({
+          question_id: questionId,
+          image_slot: imageSlot,
+          prompt,
+          image_url: url,
+          status: "cached",
+        }, { onConflict: "question_id,image_slot" }).then(() => {});
       }
     } catch (e) {
       console.warn("Image generation failed:", e);
     } finally {
       inFlightRef.current.delete(key);
-      setLoadingImages(prev => { const n = { ...prev }; delete n[key]; return n; });
+      setLoadingImages((prev) => { const n = { ...prev }; delete n[key]; return n; });
     }
   }, []);
 
-  // Kick off image generation for a given question (photos + video thumbnail)
   const generateForQuestion = useCallback((q: ExamQuestion) => {
     q.imagePrompts.forEach((prompt, i) => generateImageForKey(imageKey(q.id, i), prompt));
-    if (q.opgaveType === "video" && q.videoThumbnailPrompt) {
-      generateImageForKey(videoThumbKey(q.id), q.videoThumbnailPrompt);
-    }
   }, [generateImageForKey]);
 
-  // Auto-generate current question's images and pre-fetch next question
+  // Auto-generate current question + pre-fetch next
   useEffect(() => {
     generateForQuestion(question);
     const next = questions[currentIndex + 1];
     if (next) generateForQuestion(next);
   }, [question.id, generateForQuestion]);
 
-  // Reset video state when question changes
-  useEffect(() => {
-    speechSynthesis.cancel();
-    if (videoTimerRef.current) clearInterval(videoTimerRef.current);
-    setIsVideoPlaying(false);
-    setVideoProgress(0);
-  }, [question.id]);
-
-  // Video player: narrate the scene description via speech synthesis
-  const handleVideoPlay = useCallback(() => {
-    if (isVideoPlaying) {
-      speechSynthesis.cancel();
-      if (videoTimerRef.current) clearInterval(videoTimerRef.current);
-      setIsVideoPlaying(false);
-      setVideoProgress(0);
-      return;
-    }
-    const text = question.videoDescription ?? "";
-    if (!text) return;
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "nl-NL";
-    utterance.rate = 0.85;
-
-    // Rough duration estimate: ~75 ms per character at 0.85x speed
-    const durationMs = Math.max(text.length * 75, 4000);
-    const startTime = Date.now();
-
-    setIsVideoPlaying(true);
-    setVideoProgress(0);
-
-    videoTimerRef.current = setInterval(() => {
-      const pct = Math.min(((Date.now() - startTime) / durationMs) * 100, 99);
-      setVideoProgress(pct);
-    }, 100);
-
-    utterance.onend = () => {
-      if (videoTimerRef.current) clearInterval(videoTimerRef.current);
-      setVideoProgress(100);
-      setTimeout(() => { setIsVideoPlaying(false); setVideoProgress(0); }, 800);
-    };
-
-    speechSynthesis.speak(utterance);
-  }, [isVideoPlaying, question.videoDescription]);
-
   const speakDutch = useCallback((text: string) => {
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "nl-NL";
-    utterance.rate = 0.85;
-    speechSynthesis.speak(utterance);
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "nl-NL";
+    u.rate = 0.85;
+    speechSynthesis.speak(u);
   }, []);
 
   const evaluateAnswer = useCallback(async (answer: string) => {
@@ -162,16 +134,15 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
         },
       });
       if (error) throw error;
-      const stars = data.starRating || 3;
+      const stars = data.starRating ?? 3;
       setFeedback({ text: data.feedback, stars, correctedDutch: data.correctedDutch });
-      setResults(prev => ({
+      setResults((prev) => ({
         ...prev,
         [question.id]: { questionId: question.id, userAnswer: answer, feedback: data.feedback, starRating: stars },
       }));
-    } catch (e) {
-      console.error("Evaluation failed:", e);
+    } catch {
       setFeedback({ text: "Good attempt! Keep practicing with short, simple sentences.", stars: 3 });
-      setResults(prev => ({
+      setResults((prev) => ({
         ...prev,
         [question.id]: { questionId: question.id, userAnswer: answer },
       }));
@@ -180,14 +151,15 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
     }
   }, [question, currentIndex, questions.length, opgaveInfo]);
 
-  const { isListening, isPreparing, interimText: examInterimText, startListening, stopListening } = useSpeechRecognition({
-    scenario: `Exam Q${currentIndex + 1}`,
-    lang: "nl-NL",
-    onTranscript: evaluateAnswer,
-    onFallbackToText: useCallback(() => setShowTextInput(true), []),
-    mode: "manual",
-    autoStopSeconds: 30,
-  });
+  const { isListening, isPreparing, interimText: examInterimText, startListening, stopListening } =
+    useSpeechRecognition({
+      scenario: `Exam Q${currentIndex + 1}`,
+      lang: "nl-NL",
+      onTranscript: evaluateAnswer,
+      onFallbackToText: useCallback(() => setShowTextInput(true), []),
+      mode: "manual",
+      autoStopSeconds: 30,
+    });
 
   const handleTextSubmit = () => {
     if (textInput.trim()) { evaluateAnswer(textInput.trim()); setTextInput(""); }
@@ -203,142 +175,74 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
   };
 
   const handleFinish = () => {
-    const allResults = questions.map(q => results[q.id] || { questionId: q.id, userAnswer: "(not answered)" });
+    const allResults = questions.map((q) => results[q.id] ?? { questionId: q.id, userAnswer: "(not answered)" });
     onComplete(allResults);
   };
 
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-  };
+  const formatTime = (s: number) =>
+    `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
 
   const isNewOpgave = currentIndex === 0 || questions[currentIndex - 1].opgave !== currentOpgave;
   const answeredCurrent = !!results[question.id];
 
-  // ── Video player ────────────────────────────────────────────────────────────
-  const renderVideo = () => {
-    const key = videoThumbKey(question.id);
-    const thumbUrl = generatedImages[key];
-    const isLoading = loadingImages[key];
-
-    return (
-      <div className="rounded-2xl overflow-hidden border border-border relative aspect-video bg-slate-900 select-none">
-        {/* Thumbnail */}
-        {thumbUrl ? (
-          <img
-            src={thumbUrl}
-            alt="Video preview"
-            className={`w-full h-full object-cover transition-opacity duration-500 ${isVideoPlaying ? "opacity-50" : "opacity-85"}`}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900">
-            {isLoading ? (
-              <div className="flex flex-col items-center gap-2 text-white/40">
-                <Loader2 className="h-8 w-8 animate-spin" />
-                <p className="text-xs font-medium">Filmpje laden…</p>
-              </div>
-            ) : (
-              <Film className="h-16 w-16 text-white/15" />
-            )}
-          </div>
-        )}
-
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
-
-        {/* Subtitles shown while playing */}
-        <AnimatePresence>
-          {isVideoPlaying && (
-            <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 6 }}
-              className="absolute bottom-14 left-4 right-4"
-            >
-              <div className="rounded-lg bg-black/80 px-3 py-2 text-center">
-                <p className="text-white text-sm leading-snug">{question.videoDescription}</p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Progress bar */}
-        {videoProgress > 0 && (
-          <div className="absolute bottom-10 left-4 right-4 h-0.5 bg-white/20 rounded-full overflow-hidden">
-            <motion.div
-              className="h-full bg-white rounded-full"
-              style={{ width: `${videoProgress}%` }}
-              transition={{ ease: "linear" }}
-            />
-          </div>
-        )}
-
-        {/* Controls bar */}
-        <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-4 py-2.5">
-          <span className="text-white/50 text-xs font-medium flex items-center gap-1.5">
-            <Film className="h-3.5 w-3.5" /> Filmpje — Opgave 1
-          </span>
-          <button
-            onClick={handleVideoPlay}
-            className="flex items-center gap-1.5 bg-white/90 hover:bg-white active:scale-95 text-black px-4 py-1.5 rounded-full text-sm font-bold transition-all"
-          >
-            {isVideoPlaying
-              ? <><Pause className="h-3.5 w-3.5" /> Stop</>
-              : <><Play className="h-3.5 w-3.5" /> Bekijk de video</>
-            }
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  // ── Photo(s) ────────────────────────────────────────────────────────────────
+  // ── Photo grid ──────────────────────────────────────────────────────────────
   const renderPhotos = () => {
     const count = question.imagePrompts.length;
+    if (count === 0) return null;
+
     const gridClass =
       count === 1 ? "" :
       count === 2 ? "grid grid-cols-2 gap-3" :
       "grid grid-cols-3 gap-2";
 
     return (
-      <div className={gridClass}>
-        {question.imagePrompts.map((_, i) => {
-          const key = imageKey(question.id, i);
-          const imgUrl = generatedImages[key];
-          const isLoading = loadingImages[key];
-          return (
-            <div
-              key={i}
-              className="rounded-2xl overflow-hidden bg-muted aspect-[4/3] flex items-center justify-center border border-border relative"
-            >
-              {count > 1 && (
-                <span className="absolute top-2 left-2 bg-foreground/80 text-background text-xs font-bold px-2 py-0.5 rounded-md z-10">
-                  {i + 1}
-                </span>
-              )}
-              {imgUrl ? (
-                <motion.img
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  src={imgUrl}
-                  alt={question.placeholderDescriptions[i]}
-                  className="w-full h-full object-cover"
-                />
-              ) : isLoading ? (
-                <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                  <p className="text-xs font-medium">Foto laden…</p>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center gap-2 text-muted-foreground p-4 text-center">
-                  <Camera className="h-8 w-8 opacity-40" />
-                  <p className="text-xs font-medium">{question.placeholderDescriptions[i]}</p>
-                </div>
-              )}
-            </div>
-          );
-        })}
+      <div className="space-y-2">
+        <div className={gridClass}>
+          {question.imagePrompts.map((_, i) => {
+            const key = imageKey(question.id, i);
+            const imgUrl = generatedImages[key];
+            const isLoading = loadingImages[key];
+            return (
+              <div
+                key={i}
+                className="rounded-2xl overflow-hidden bg-muted aspect-[4/3] flex items-center justify-center border border-border relative"
+              >
+                {count > 1 && (
+                  <span className="absolute top-2 left-2 bg-foreground/80 text-background text-xs font-bold px-2 py-0.5 rounded-md z-10">
+                    {i + 1}
+                  </span>
+                )}
+                {imgUrl ? (
+                  <motion.img
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    src={imgUrl}
+                    alt={question.placeholderDescriptions[i]}
+                    className="w-full h-full object-cover"
+                  />
+                ) : isLoading ? (
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                    <p className="text-xs font-medium">Foto laden…</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground p-4 text-center">
+                    <Camera className="h-8 w-8 opacity-40" />
+                    <p className="text-xs font-medium">{question.placeholderDescriptions[i]}</p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* For video-based questions, show the scene description as context */}
+        {question.opgaveType === "video" && question.videoDescription && (
+          <div className="rounded-xl bg-muted/60 border border-border px-4 py-3">
+            <p className="text-xs font-bold text-muted-foreground mb-1 uppercase tracking-wide">Situatie in de video</p>
+            <p className="text-sm text-foreground leading-relaxed">{question.videoDescription}</p>
+          </div>
+        )}
       </div>
     );
   };
@@ -346,7 +250,7 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
   // ── Main render ─────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-4 max-w-2xl mx-auto">
-      {/* Top bar: timer + progress */}
+      {/* Top bar */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-muted-foreground">
           <Clock className="h-4 w-4" />
@@ -357,7 +261,7 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
         </span>
       </div>
 
-      {/* Question navigation dots */}
+      {/* Navigation dots */}
       <div className="flex items-center gap-1 justify-center flex-wrap">
         {questions.map((q, i) => {
           const isAnswered = !!results[q.id];
@@ -383,7 +287,7 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
         })}
       </div>
 
-      {/* Opgave header (shown once per section) */}
+      {/* Opgave header */}
       {isNewOpgave && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -395,10 +299,10 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
         </motion.div>
       )}
 
-      {/* Visual content: video player or photo(s) */}
-      {question.opgaveType === "video" ? renderVideo() : renderPhotos()}
+      {/* Photos */}
+      {renderPhotos()}
 
-      {/* Situation + Question card */}
+      {/* Situation + question card */}
       <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
         <div>
           <p className="text-sm text-muted-foreground italic">{question.situationDutch}</p>
@@ -424,7 +328,7 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
           </div>
         </div>
 
-        {/* Hints toggle */}
+        {/* Hints */}
         <button
           onClick={() => setShowHints(!showHints)}
           className="flex items-center gap-1.5 text-xs font-semibold text-primary"

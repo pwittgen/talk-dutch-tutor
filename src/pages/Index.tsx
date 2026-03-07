@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { BarChart3, Settings, LogIn, LogOut, Shield } from "lucide-react";
+import { BarChart3, Settings, LogIn, LogOut, Shield, Mic, BookOpen, Headphones, PenLine, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { scenarios, sections } from "@/data/scenarios";
 import { useVocabThemes } from "@/hooks/useVocabThemes";
@@ -9,6 +9,53 @@ import VocabCategoryCard from "@/components/VocabCategoryCard";
 import SectionTabs, { type SectionId } from "@/components/SectionTabs";
 import { useAuth } from "@/hooks/useAuth";
 import heroImage from "@/assets/hero-dutch.jpg";
+
+const examCategories = [
+  {
+    id: "spreken",
+    title: "Spreken",
+    dutchTitle: "Spreekvaardigheid",
+    emoji: "🗣️",
+    icon: Mic,
+    description: "Beantwoord vragen over plaatjes en situaties",
+    detail: "16 vragen · 4 onderdelen · ±35 min",
+    available: true,
+    route: "/exam",
+  },
+  {
+    id: "lezen",
+    title: "Lezen",
+    dutchTitle: "Leesvaardigheid",
+    emoji: "📖",
+    icon: BookOpen,
+    description: "Lees korte teksten en beantwoord meerkeuzevragen",
+    detail: "25 vragen · 13 teksten · ±45 min",
+    available: true,
+    hubSection: "lezen",
+  },
+  {
+    id: "luisteren",
+    title: "Luisteren",
+    dutchTitle: "Luistervaardigheid",
+    emoji: "👂",
+    icon: Headphones,
+    description: "Luister naar gesprekken en beantwoord vragen",
+    detail: "24 vragen · ±45 min",
+    available: true,
+    hubSection: "luisteren",
+  },
+  {
+    id: "schrijven",
+    title: "Schrijven",
+    dutchTitle: "Schrijfvaardigheid",
+    emoji: "✍️",
+    icon: PenLine,
+    description: "Schrijf korte teksten en berichten in het Nederlands",
+    detail: "4 opdrachten · ±30 min",
+    available: true,
+    hubSection: "schrijven",
+  },
+];
 
 const Index = () => {
   const navigate = useNavigate();
@@ -190,7 +237,6 @@ const Index = () => {
               key="exam"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              className="max-w-2xl"
             >
               <div className="mb-8 pb-4 border-b border-border">
                 <span className="text-xs tracking-[0.18em] uppercase text-muted-foreground mb-2 block font-sans">
@@ -200,41 +246,53 @@ const Index = () => {
                   Inburgering A2 Examen
                 </h2>
                 <p className="mt-2 text-muted-foreground text-sm leading-relaxed max-w-lg">
-                  Practice all sections of the Dutch civic integration exam.
+                  Oefen alle onderdelen van het DUO inburgeringsexamen. Kies een categorie om te beginnen.
                 </p>
               </div>
 
-              <div className="border border-border p-8 rounded space-y-8">
-                <div className="grid grid-cols-4 gap-4">
-                  {[
-                    { emoji: "📖", label: "Lezen" },
-                    { emoji: "🗣️", label: "Spreken" },
-                    { emoji: "👂", label: "Luisteren" },
-                    { emoji: "✍️", label: "Schrijven" },
-                  ].map(({ emoji, label }) => (
-                    <div key={label} className="flex flex-col items-center gap-2 p-4 bg-muted rounded">
-                      <span className="text-2xl">{emoji}</span>
-                      <span className="text-xs tracking-wider uppercase text-muted-foreground font-sans font-medium">
-                        {label}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                <div>
-                  <h3 className="font-display text-lg font-semibold text-foreground mb-2">
-                    4 exam categories
-                  </h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed mb-6">
-                    Practice Lezen, Spreken, Luisteren en Schrijven — following the DUO A2 format.
-                  </p>
-                  <button
-                    onClick={() => navigate("/exam-hub")}
-                    className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded text-sm font-medium hover:opacity-90 transition-opacity"
-                  >
-                    Start exam practice
-                  </button>
-                </div>
+              <div className="grid gap-5 sm:grid-cols-2">
+                {examCategories.map((cat, i) => {
+                  const Icon = cat.icon;
+                  return (
+                    <motion.button
+                      key={cat.id}
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.07 }}
+                      onClick={() => {
+                        if (!cat.available) return;
+                        if (cat.route) {
+                          navigate(cat.route);
+                        } else if (cat.hubSection) {
+                          navigate("/exam-hub", { state: { section: cat.hubSection } });
+                        }
+                      }}
+                      disabled={!cat.available}
+                      className={`relative text-left rounded border-2 p-6 transition-all ${
+                        cat.available
+                          ? "border-border bg-card hover:border-primary/40 hover:shadow-md cursor-pointer"
+                          : "border-border/50 bg-muted/30 opacity-60 cursor-not-allowed"
+                      }`}
+                    >
+                      {!cat.available && (
+                        <Lock className="absolute top-4 right-4 h-4 w-4 text-muted-foreground" />
+                      )}
+                      <div className="flex items-start gap-4">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded bg-primary/8 text-xl">
+                          {cat.emoji}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-baseline gap-2">
+                            <h3 className="font-display text-base font-semibold text-foreground">{cat.title}</h3>
+                            <span className="text-xs text-muted-foreground italic">{cat.dutchTitle}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{cat.description}</p>
+                          <p className="text-xs text-primary font-medium mt-2">{cat.detail}</p>
+                        </div>
+                      </div>
+                    </motion.button>
+                  );
+                })}
               </div>
             </motion.div>
           )}

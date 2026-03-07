@@ -1,5 +1,4 @@
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
 
 export type SectionId = "practice" | "learn" | "exam";
 
@@ -11,18 +10,12 @@ interface SectionTabsProps {
 const tabs: { id: SectionId; label: string; subtitle: string }[] = [
   { id: "practice", label: "Practice", subtitle: "Conversations" },
   { id: "learn", label: "Learn", subtitle: "Vocabulary" },
-  { id: "exam", label: "Exam Prep", subtitle: "Speaking Test" },
+  { id: "exam", label: "Exam Prep", subtitle: "A2 Examen" },
 ];
 
 const SectionTabs = ({ activeSection, onSectionChange }: SectionTabsProps) => {
-  const navigate = useNavigate();
-
   const handleTabClick = (tabId: SectionId) => {
-    if (tabId === "exam") {
-      navigate("/exam-hub");
-    } else {
-      onSectionChange(tabId);
-    }
+    onSectionChange(tabId);
   };
 
   return (
