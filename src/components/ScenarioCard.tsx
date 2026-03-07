@@ -7,15 +7,9 @@ interface ScenarioCardProps {
   index: number;
 }
 
-const colorMap = {
-  orange: "bg-gradient-hero",
-  blue: "bg-gradient-delft",
-  teal: "bg-gradient-success",
-};
-
 const difficultyLabel = {
   beginner: "A1",
-  easy: "A1-A2",
+  easy: "A1–A2",
   medium: "A2",
 };
 
@@ -24,49 +18,43 @@ const ScenarioCard = ({ scenario, index }: ScenarioCardProps) => {
 
   return (
     <motion.button
-      initial={{ opacity: 0, y: 30 }}
+      initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.08, duration: 0.5, ease: "easeOut" }}
-      whileHover={{ y: -6, scale: 1.02 }}
-      whileTap={{ scale: 0.97 }}
+      transition={{ delay: index * 0.07, duration: 0.45, ease: "easeOut" }}
+      whileHover={{ y: -4, scale: 1.015 }}
+      whileTap={{ scale: 0.98 }}
       onClick={() => navigate(`/scenario/${scenario.id}`)}
-      className="group relative flex flex-col items-start overflow-hidden rounded-2xl bg-card text-left shadow-card transition-shadow hover:shadow-card-hover"
+      className="group flex flex-col items-start overflow-hidden rounded bg-card border border-border text-left shadow-card transition-shadow hover:shadow-card-hover"
     >
       {/* Scenario image */}
-      <div className="relative w-full h-32 overflow-hidden">
+      <div className="relative w-full h-36 overflow-hidden bg-muted">
         <img
           src={scenario.scenarioImage}
           alt={scenario.title}
-          className="w-full h-full object-cover transition-transform group-hover:scale-105"
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
-        <div className="absolute top-2 left-2 flex h-10 w-10 items-center justify-center rounded-xl bg-card/90 text-xl backdrop-blur-sm">
-          {scenario.emoji}
+      </div>
+
+      <div className="p-5 flex flex-col gap-1.5 w-full">
+        {/* Level label */}
+        <span className="text-[10px] tracking-[0.18em] uppercase text-muted-foreground font-sans">
+          {scenario.emoji} {difficultyLabel[scenario.difficulty]}
+        </span>
+
+        <h3 className="font-display text-lg font-semibold text-foreground leading-snug">
+          {scenario.title}
+        </h3>
+        <p className="text-sm text-secondary italic font-sans">
+          {scenario.dutchTitle}
+        </p>
+        <p className="text-sm text-muted-foreground leading-relaxed font-sans">
+          {scenario.description}
+        </p>
+
+        {/* CTA */}
+        <div className="mt-3 text-sm font-medium text-primary opacity-0 transition-opacity duration-200 group-hover:opacity-100 font-sans">
+          Begin →
         </div>
-      </div>
-
-      <div className="p-5">
-
-      {/* Difficulty badge */}
-      <span
-        className={`mb-2 inline-block rounded-full px-3 py-0.5 text-xs font-bold text-primary-foreground ${colorMap[scenario.color]}`}
-      >
-        {difficultyLabel[scenario.difficulty]}
-      </span>
-
-      <h3 className="font-display text-lg font-bold text-foreground">
-        {scenario.title}
-      </h3>
-      <p className="text-sm font-medium text-secondary italic">
-        {scenario.dutchTitle}
-      </p>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {scenario.description}
-      </p>
-
-      {/* Arrow indicator */}
-      <div className="mt-4 flex items-center gap-1 text-sm font-semibold text-primary opacity-0 transition-opacity group-hover:opacity-100">
-        Start practice →
-      </div>
       </div>
     </motion.button>
   );
