@@ -202,7 +202,7 @@ const AdminExamPage = () => {
   // ── Images tab: actions ───────────────────────────────────────────────────
 
   const handleApprove = async (questionId: number, slot: number) => {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from("exam_question_images")
       .update({ status: "approved" })
       .eq("question_id", questionId)
