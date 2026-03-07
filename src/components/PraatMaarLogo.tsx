@@ -35,7 +35,7 @@ const PraatMaarLogo = ({
         style={{
           fontFamily: "'Space Mono', monospace",
           fontWeight: 700,
-          fontSize: "0.858em",
+          fontSize: "0.95em",
           color: colors.maar,
           letterSpacing: "-0.02em",
           lineHeight: 1,
@@ -48,7 +48,7 @@ const PraatMaarLogo = ({
           fontFamily: "'Space Mono', monospace",
           fontWeight: 400,
           color: colors.cursor,
-          fontSize: "0.858em",
+          fontSize: "0.95em",
           animation: "blink 1.1s step-end infinite",
           lineHeight: 1,
         }}
