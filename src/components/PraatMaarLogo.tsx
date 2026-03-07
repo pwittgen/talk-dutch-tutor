@@ -23,7 +23,7 @@ const PraatMaarLogo = ({
         style={{
           fontFamily: "'Playfair Display', Georgia, serif",
           fontWeight: 900,
-          fontSize: "0.72em",
+          fontSize: "0.82em",
           color: colors.praat,
           lineHeight: 1,
           letterSpacing: 0,
