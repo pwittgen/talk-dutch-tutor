@@ -83,7 +83,7 @@ const ExamSimulation = ({ questions, onComplete }: ExamSimulationProps) => {
         generatedRef.current[key] = url;
         setGeneratedImages((prev) => ({ ...prev, [key]: url }));
         // Best-effort cache save (no await — don't block the UI)
-        supabase.from("exam_question_images").upsert({
+        (supabase as any).from("exam_question_images").upsert({
           question_id: questionId,
           image_slot: imageSlot,
           prompt,
