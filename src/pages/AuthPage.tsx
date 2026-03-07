@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
+import PraatMaarLogo from "@/components/PraatMaarLogo";
 
 const AuthPage = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -51,14 +51,14 @@ const AuthPage = () => {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-sm space-y-6"
       >
-        <div className="text-center">
-          <h1 className="font-display text-3xl font-black text-foreground">🇳🇱 Praat maar!</h1>
-          <p className="mt-2 text-muted-foreground">
+        <div>
+          <PraatMaarLogo maarSize="32px" className="mb-3" />
+          <p className="font-sans text-warm-grey text-sm">
             {isLogin ? "Log in to continue learning" : "Create your account"}
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl bg-card border border-border p-6 shadow-card">
+        <form onSubmit={handleSubmit} className="space-y-4 rounded bg-card border border-sand p-6">
           {!isLogin && (
             <Input
               placeholder="Display name"
@@ -82,14 +82,18 @@ const AuthPage = () => {
             required
             minLength={6}
           />
-          <Button type="submit" className="w-full rounded-xl bg-gradient-hero text-primary-foreground" disabled={loading}>
-            {loading ? "..." : isLogin ? "Log In" : "Sign Up"}
-          </Button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-rust text-off-white font-sans font-medium py-2.5 rounded text-sm hover:bg-ink transition-colors disabled:opacity-60"
+          >
+            {loading ? "..." : isLogin ? "Log in" : "Sign up"}
+          </button>
         </form>
 
-        <p className="text-center text-sm text-muted-foreground">
+        <p className="font-sans text-center text-sm text-warm-grey">
           {isLogin ? "No account? " : "Already have an account? "}
-          <button onClick={() => setIsLogin(!isLogin)} className="font-semibold text-primary hover:underline">
+          <button onClick={() => setIsLogin(!isLogin)} className="font-medium text-rust hover:underline">
             {isLogin ? "Sign up" : "Log in"}
           </button>
         </p>
