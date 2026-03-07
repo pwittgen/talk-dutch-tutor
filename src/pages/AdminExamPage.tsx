@@ -221,7 +221,7 @@ const AdminExamPage = () => {
   };
 
   const handleReject = async (questionId: number, slot: number) => {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from("exam_question_images")
       .update({ status: "rejected" })
       .eq("question_id", questionId)
