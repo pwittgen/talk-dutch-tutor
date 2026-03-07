@@ -153,7 +153,7 @@ const AdminExamPage = () => {
 
   const fetchImageRecords = useCallback(async () => {
     setImagesLoading(true);
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from("exam_question_images")
       .select("*")
       .order("question_id", { ascending: true })
