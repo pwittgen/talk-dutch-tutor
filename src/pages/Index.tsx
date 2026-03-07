@@ -301,7 +301,7 @@ const Index = () => {
       {/* Footer */}
       <footer className="border-t border-sand/20 py-10 bg-ink text-cream">
         <div className="mx-auto max-w-5xl px-6 flex items-center justify-between">
-          <PraatMaarLogo maarSize="16px" cursorColor="#B8895A" />
+          <PraatMaarLogo maarSize="16px" variant="dark" />
           <p className="font-sans text-sm" style={{ color: "#6B6560" }}>
             Made with care for Dutch learners.
           </p>
